@@ -58,10 +58,11 @@ func (m *MongoStarter) Start() (interface{}, error) {
 }
 
 func (m *MongoStarter) Stop(maxWaitTime time.Duration) (gracefully, stopped bool, err error) {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 	done := make(chan error)
 	go func() {
-		err = mongoClient.Disconnect(context.Background())
-		done <- err
+		done <- mongoClient.Disconnect(ctx)
 	}()
 	stopped = true
 	select {
