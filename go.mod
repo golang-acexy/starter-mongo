@@ -1,17 +1,18 @@
 module github.com/golang-acexy/starter-mongo
 
-go 1.21.5
+go 1.21.0
+
+toolchain go1.21.5
 
 require (
-	github.com/acexy/golang-toolkit v0.0.23
-	github.com/golang-acexy/starter-parent v0.1.5
-	go.mongodb.org/mongo-driver v1.16.1
+	github.com/acexy/golang-toolkit v0.0.26
+	github.com/golang-acexy/starter-parent v0.1.7
+	go.mongodb.org/mongo-driver/v2 v2.0.0-beta2
 )
 
 require (
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
-	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/klauspost/compress v1.17.10 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
