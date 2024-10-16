@@ -16,8 +16,8 @@ var loader *parent.StarterLoader
 func init() {
 	loader = parent.NewStarterLoader([]parent.Starter{
 		&mongostarter.MongoStarter{
-			MongoUri: "mongodb://acexy:tech-acexy@localhost:27017",
-			Database: "local",
+			MongoUri: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
+			//Database: "local",
 			BsonOpts: &options.BSONOptions{
 				UseJSONStructTags:   true,
 				ObjectIDAsHexString: true,

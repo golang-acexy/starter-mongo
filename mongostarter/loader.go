@@ -8,6 +8,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -18,8 +20,6 @@ type MongoStarter struct {
 
 	// 工作数据库
 	Database string
-	// 认证时指向的数据库
-	AuthSource string
 
 	// Mongo 链接地址串 如果设置了则忽略上面的配置
 	MongoUri string
@@ -75,6 +75,20 @@ func (m *MongoStarter) Start() (interface{}, error) {
 	if m.BsonOpts != nil {
 		clientOptions.SetBSONOptions(m.BsonOpts)
 	}
+
+	if defaultDatabase == "" {
+		// 从 URI 的路径部分提取数据库名称（如果有）
+		parsedURI, err := url.Parse(clientOptions.GetURI())
+		if err == nil {
+			// 获取路径部分并去掉前导的 '/'
+			database := strings.TrimPrefix(parsedURI.Path, "/")
+			if database != "" {
+				defaultDatabase = database
+			}
+		}
+
+	}
+
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
