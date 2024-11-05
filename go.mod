@@ -5,8 +5,8 @@ go 1.21.0
 toolchain go1.21.5
 
 require (
-	github.com/acexy/golang-toolkit v0.0.28
-	github.com/golang-acexy/starter-parent v0.1.8
+	github.com/acexy/golang-toolkit v0.0.32
+	github.com/golang-acexy/starter-parent v0.1.9
 	go.mongodb.org/mongo-driver/v2 v2.0.0-beta2
 )
 

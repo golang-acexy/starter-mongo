@@ -8,24 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-//type BaseModel struct {
-//	ID string `bson:"_id" json:"id"`
-//}
-//
-//func (s *BaseModel) UnmarshalBSON(data []byte) error {
-//	var raw map[string]interface{}
-//	if err := bson.Unmarshal(data, &raw); err != nil {
-//		return err
-//	}
-//
-//	// 手动设置 _id 字段
-//	if id, ok := raw["_id"]; ok {
-//		s.ID = id.(string)
-//	}
-//
-//	return bson.Unmarshal(data, s)
-//}
-
 type IBaseModel interface {
 	CollectionName() string
 }
