@@ -70,8 +70,6 @@ func checkSingleResult(singleResult *mongo.SingleResult, result interface{}) err
 	if singleResult.Err() != nil {
 		return singleResult.Err()
 	}
-	fmt.Println(singleResult.Raw())
-
 	return singleResult.Decode(result)
 }
 
@@ -172,7 +170,7 @@ func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
 	return checkMultipleResult(cursor, err, result)
 }
 
-// SelectOneByCond 通过条件查询 零值不参与查询条件
+// SelectOneByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
 func (b *BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns ...string) error {
 	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
@@ -189,7 +187,7 @@ func (b *BaseMapper[T]) SelectOneByCollection(filter interface{}, result *T, opt
 	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), filter, opts...), result)
 }
 
-// SelectByCond 通过条件查询 零值不参与查询条件
+// SelectByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
 func (b *BaseMapper[T]) SelectByCond(condition *T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
 	opt := specifyColumnsOpt(specifyColumns...)
@@ -217,7 +215,7 @@ func (b *BaseMapper[T]) SelectByCollection(filter interface{}, result *[]*T, opt
 	return checkMultipleResult(cursor, err, result)
 }
 
-// CountByCond 通过条件查询数据总数 查询条件零值字段将被自动忽略
+// CountByCond 通过条件查询数据总数
 func (b *BaseMapper[T]) CountByCond(condition *T) (int64, error) {
 	return collection(b.Value.CollectionName()).CountDocuments(context.Background(), condition)
 }
@@ -295,7 +293,7 @@ func (b *BaseMapper[T]) SelectPageByCollection(filter interface{}, orderBy []*Or
 	return total, checkMultipleResult(cursor, err, result)
 }
 
-// Save 保存数据 零值不会参与保存
+// Save 保存数据
 func (b *BaseMapper[T]) Save(entity *T) (string, error) {
 	return checkSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
 }
@@ -310,7 +308,7 @@ func (b *BaseMapper[T]) SaveByCollection(document interface{}, opts ...options.L
 	return checkSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), document, opts...))
 }
 
-// SaveBatch 批量保存数据 零值不会参与保存
+// SaveBatch 批量保存数据
 func (b *BaseMapper[T]) SaveBatch(entity *[]*T) ([]string, error) {
 	return checkMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
 }
@@ -325,7 +323,7 @@ func (b *BaseMapper[T]) SaveBatchByCollection(documents interface{}, opts ...opt
 	return checkMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), documents, opts...))
 }
 
-// UpdateById 根据主键更新数据 id ObjectId hex 零值不参与更新
+// UpdateById 根据主键更新数据 id ObjectId hex
 func (b *BaseMapper[T]) UpdateById(id string, entity *T) (bool, error) {
 	hex, err := bson.ObjectIDFromHex(id)
 	if err != nil {
