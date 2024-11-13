@@ -20,23 +20,22 @@ var mapper = StartupLogMapper{}
 
 func TestSelectById(t *testing.T) {
 	var log StartupLog
-	_ = mapper.SelectById("998a29f641e6-1726056851285", &log)
-	fmt.Println(json.ToJson(log))
+	fmt.Println(mapper.SelectById("6733121fe9a67c280557c6d1", &log))
 }
 
 func TestSelectByIds(t *testing.T) {
-	var logs []StartupLog
-	_ = mapper.SelectByIds([]string{"998a29f641e6-1726056851285", "998a29f641e6-1726056854030"}, &logs)
+	var logs []*StartupLog
+	fmt.Println(mapper.SelectByIds([]string{"6733121fe9a67c280557c6d1", "67331275587bf0fa60630627"}, &logs))
 	fmt.Println(json.ToJson(logs))
 }
 
 func TestSelectOne(t *testing.T) {
 	data := StartupLog{Pid: 28}
-	err := mapper.SelectOneByCondition(&data, &data)
+	err := mapper.SelectOneByCond(&data, &data)
 	fmt.Println(err)
 	fmt.Println(json.ToJson(data))
 
-	err = mapper.SelectOneByCondition(&data, &data, "hostname")
+	err = mapper.SelectOneByCond(&data, &data, "hostname")
 	fmt.Println(err)
 	fmt.Println(json.ToJson(data))
 
@@ -47,12 +46,73 @@ func TestSelectOne(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	data := StartupLog{Hostname: "998a29f641e6"}
-	var dataList []StartupLog
-	err := mapper.SelectByCondition(&data, &dataList)
+	var dataList []*StartupLog
+	err := mapper.SelectByCond(&data, mongostarter.NewOrderBy("_id", true), &dataList)
 	fmt.Println(err)
 	fmt.Println(json.ToJson(dataList))
 
-	err = mapper.SelectByBson(bson.M{"hostname": "998a29f641e6"}, &dataList)
+	err = mapper.SelectByBson(bson.M{"hostname": "998a29f641e6"}, nil, &dataList)
 	fmt.Println(err)
 	fmt.Println(json.ToJson(dataList))
+}
+
+func TestCount(t *testing.T) {
+	data := StartupLog{Hostname: "998a29f641e6"}
+	fmt.Println(mapper.CountByCond(&data))
+}
+
+func TestSave(t *testing.T) {
+	data := StartupLog{Hostname: "998a29f641e6"}
+	fmt.Println(mapper.Save(&data))
+	data.ID = "123456"
+	fmt.Println(mapper.Save(&data))
+}
+
+func TestSaveBatch(t *testing.T) {
+	data := []*StartupLog{
+		{Hostname: "998a29f641e61111"},
+		{Hostname: "998a29f641e11111"},
+	}
+	fmt.Println(mapper.SaveBatch(&data))
+
+	many := []*bson.M{
+		{"hostname": "123456"},
+		{"hostname": "654321"},
+	}
+	fmt.Println(mapper.SaveBatchByBson(&many))
+
+}
+
+func TestPage(t *testing.T) {
+	var dataList []*StartupLog
+	total, err := mapper.SelectPageByCond(&StartupLog{}, nil, 1, 2, &dataList)
+	fmt.Println(total, err)
+	fmt.Println(json.ToJsonFormat(dataList))
+	total, err = mapper.SelectPageByCollection(bson.M{"hostname": "998a29f641e6"}, nil, 2, 2, &dataList)
+	fmt.Println(total, err)
+	fmt.Println(json.ToJsonFormat(dataList))
+}
+
+func TestUpdateById(t *testing.T) {
+	fmt.Println(mapper.UpdateById("67341bbe028d800a2c3c6075", &StartupLog{Pid: 29}))
+	fmt.Println(mapper.UpdateByIdUseBson("67341bbe028d800a2c3c6074", bson.M{"hostname": "998a29f641e6", "pid": 28}))
+}
+
+func TestUpdateOne(t *testing.T) {
+	cond := StartupLog{Hostname: "998a29f641e6"}
+	upd := StartupLog{Pid: 1}
+	fmt.Println(mapper.UpdateOneByCond(&cond, &upd))
+	fmt.Println(mapper.UpdateOneByCondUseBson(bson.M{"hostname": "998a29f641e1"}, bson.M{"hostname": "123"}))
+}
+
+func TestUpdateMany(t *testing.T) {
+	cond := StartupLog{Hostname: "998a29f641e11111"}
+	upd := StartupLog{Pid: 1}
+	fmt.Println(mapper.UpdateManyByCond(&cond, &upd))
+}
+
+func TestDelete(t *testing.T) {
+	fmt.Println(mapper.DeleteById("67341b9ef567a4ecb209be4f"))
+	fmt.Println(mapper.DeleteOneByCond(&StartupLog{Hostname: "998a29f641e6"}))
+	fmt.Println(mapper.DeleteManyByCondUseBson(bson.M{"hostname": "998a29f641e6"}))
 }

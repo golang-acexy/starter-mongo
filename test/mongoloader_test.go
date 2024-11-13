@@ -16,15 +16,17 @@ var loader *parent.StarterLoader
 func init() {
 	loader = parent.NewStarterLoader([]parent.Starter{
 		&mongostarter.MongoStarter{
-			MongoUri: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
-			//Database: "local",
-			BsonOpts: &options.BSONOptions{
-				UseJSONStructTags:   true,
-				ObjectIDAsHexString: true,
-				OmitZeroStruct:      true,
-				ZeroStructs:         true,
+			MongoConfig: mongostarter.MongoConfig{
+				MongoUri: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
+				//Database: "local",
+				BsonOpts: &options.BSONOptions{
+					UseJSONStructTags:   true,
+					ObjectIDAsHexString: true,
+					OmitZeroStruct:      true,
+					ZeroStructs:         true,
+				},
+				EnableLogger: true,
 			},
-			EnableLogger: true,
 		},
 	})
 	err := loader.Start()
