@@ -324,16 +324,16 @@ func (b *BaseMapper[T]) SaveBatchByCollection(documents interface{}, opts ...opt
 }
 
 // UpdateById 根据主键更新数据 id ObjectId hex
-func (b *BaseMapper[T]) UpdateById(id string, entity *T) (bool, error) {
+func (b *BaseMapper[T]) UpdateById(update *T, id string) (bool, error) {
 	hex, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return false, err
 	}
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": entity}))
+	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
 }
 
 // UpdateByIdUseBson 根据主键更新数据
-func (b *BaseMapper[T]) UpdateByIdUseBson(id string, update bson.M) (bool, error) {
+func (b *BaseMapper[T]) UpdateByIdUseBson(update bson.M, id string) (bool, error) {
 	hex, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return false, err
@@ -342,22 +342,22 @@ func (b *BaseMapper[T]) UpdateByIdUseBson(id string, update bson.M) (bool, error
 }
 
 // UpdateOneByCond 通过条件更新单条数据
-func (b *BaseMapper[T]) UpdateOneByCond(condition, update *T) (bool, error) {
+func (b *BaseMapper[T]) UpdateOneByCond(update, condition *T) (bool, error) {
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
 // UpdateOneByCondUseBson 通过条件更新单条数据
-func (b *BaseMapper[T]) UpdateOneByCondUseBson(condition, update bson.M) (bool, error) {
+func (b *BaseMapper[T]) UpdateOneByCondUseBson(update, condition bson.M) (bool, error) {
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
 // UpdateByCond 通过条件更新多条数据
-func (b *BaseMapper[T]) UpdateByCond(condition, update *T) (bool, error) {
+func (b *BaseMapper[T]) UpdateByCond(update, condition *T) (bool, error) {
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
 // UpdateByCondUseBson 通过条件更新单条数据
-func (b *BaseMapper[T]) UpdateByCondUseBson(condition, update bson.M) (bool, error) {
+func (b *BaseMapper[T]) UpdateByCondUseBson(update, condition bson.M) (bool, error) {
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 

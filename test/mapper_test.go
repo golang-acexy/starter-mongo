@@ -94,21 +94,21 @@ func TestPage(t *testing.T) {
 }
 
 func TestUpdateById(t *testing.T) {
-	fmt.Println(mapper.UpdateById("67341bbe028d800a2c3c6075", &StartupLog{Pid: 29}))
-	fmt.Println(mapper.UpdateByIdUseBson("67341bbe028d800a2c3c6074", bson.M{"hostname": "998a29f641e6", "pid": 28}))
+	fmt.Println(mapper.UpdateById(&StartupLog{Pid: 29}, "67341bbe028d800a2c3c6075"))
+	fmt.Println(mapper.UpdateByIdUseBson(bson.M{"hostname": "998a29f641e6", "pid": 28}, "67341bbe028d800a2c3c6074"))
 }
 
 func TestUpdateOne(t *testing.T) {
 	cond := StartupLog{Hostname: "998a29f641e6"}
 	upd := StartupLog{Pid: 1}
 	fmt.Println(mapper.UpdateOneByCond(&cond, &upd))
-	fmt.Println(mapper.UpdateOneByCondUseBson(bson.M{"hostname": "998a29f641e1"}, bson.M{"hostname": "123"}))
+	fmt.Println(mapper.UpdateOneByCondUseBson(bson.M{"hostname": "123"}, bson.M{"hostname": "998a29f641e1"}))
 }
 
 func TestUpdateMany(t *testing.T) {
 	cond := StartupLog{Hostname: "998a29f641e11111"}
 	upd := StartupLog{Pid: 1}
-	fmt.Println(mapper.UpdateByCond(&cond, &upd))
+	fmt.Println(mapper.UpdateByCond(&upd, &cond))
 }
 
 func TestDelete(t *testing.T) {
