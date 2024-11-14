@@ -108,11 +108,11 @@ func TestUpdateOne(t *testing.T) {
 func TestUpdateMany(t *testing.T) {
 	cond := StartupLog{Hostname: "998a29f641e11111"}
 	upd := StartupLog{Pid: 1}
-	fmt.Println(mapper.UpdateManyByCond(&cond, &upd))
+	fmt.Println(mapper.UpdateByCond(&cond, &upd))
 }
 
 func TestDelete(t *testing.T) {
 	fmt.Println(mapper.DeleteById("67341b9ef567a4ecb209be4f"))
 	fmt.Println(mapper.DeleteOneByCond(&StartupLog{Hostname: "998a29f641e6"}))
-	fmt.Println(mapper.DeleteManyByCondUseBson(bson.M{"hostname": "998a29f641e6"}))
+	fmt.Println(mapper.DeleteByCondUseBson(bson.M{"hostname": "998a29f641e6"}))
 }

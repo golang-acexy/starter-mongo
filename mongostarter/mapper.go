@@ -351,13 +351,13 @@ func (b *BaseMapper[T]) UpdateOneByCondUseBson(condition, update bson.M) (bool, 
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
-// UpdateManyByCond 通过条件更新多条数据
-func (b *BaseMapper[T]) UpdateManyByCond(condition, update *T) (bool, error) {
+// UpdateByCond 通过条件更新多条数据
+func (b *BaseMapper[T]) UpdateByCond(condition, update *T) (bool, error) {
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
-// UpdateManyByCondUseBson 通过条件更新单条数据
-func (b *BaseMapper[T]) UpdateManyByCondUseBson(condition, update bson.M) (bool, error) {
+// UpdateByCondUseBson 通过条件更新单条数据
+func (b *BaseMapper[T]) UpdateByCondUseBson(condition, update bson.M) (bool, error) {
 	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
@@ -380,12 +380,12 @@ func (b *BaseMapper[T]) DeleteOneByCondUseBson(condition bson.M) (bool, error) {
 	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
 }
 
-// DeleteManyByCond 通过条件删除数据
-func (b *BaseMapper[T]) DeleteManyByCond(condition *T) (bool, error) {
+// DeleteByCond 通过条件删除数据
+func (b *BaseMapper[T]) DeleteByCond(condition *T) (bool, error) {
 	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
 }
 
-// DeleteManyByCondUseBson 通过条件删除数据
-func (b *BaseMapper[T]) DeleteManyByCondUseBson(condition bson.M) (bool, error) {
+// DeleteByCondUseBson 通过条件删除数据
+func (b *BaseMapper[T]) DeleteByCondUseBson(condition bson.M) (bool, error) {
 	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
 }
