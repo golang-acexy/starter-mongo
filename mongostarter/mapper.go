@@ -139,12 +139,18 @@ func (b *BaseMapper[T]) Collection() *mongo.Collection {
 	return collection(b.Value.CollectionName())
 }
 
-func (b *BaseMapper[T]) SelectById(id string, result *T) error {
-	hex, err := bson.ObjectIDFromHex(id)
-	if err != nil {
-		return err
+func (b *BaseMapper[T]) SelectById(id string, result *T, notObjectId ...bool) error {
+	var queryId interface{}
+	if len(notObjectId) > 0 && notObjectId[0] {
+		queryId = id
+	} else {
+		hex, err := bson.ObjectIDFromHex(id)
+		if err != nil {
+			return err
+		}
+		queryId = hex
 	}
-	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), bson.M{"_id": hex}), result)
+	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
 }
 
 func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {

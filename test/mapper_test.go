@@ -6,6 +6,7 @@ import (
 	"github.com/golang-acexy/starter-mongo/mongostarter"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"testing"
+	"time"
 )
 
 func (StartupLog) CollectionName() string {
@@ -20,7 +21,8 @@ var mapper = StartupLogMapper{}
 
 func TestSelectById(t *testing.T) {
 	var log StartupLog
-	fmt.Println(mapper.SelectById("6733121fe9a67c280557c6d1", &log))
+	fmt.Println(mapper.SelectById("123456", &log, true))
+	fmt.Println(json.ToJson(log))
 }
 
 func TestSelectByIds(t *testing.T) {
@@ -65,6 +67,7 @@ func TestSave(t *testing.T) {
 	data := StartupLog{Hostname: "998a29f641e6"}
 	fmt.Println(mapper.Save(&data))
 	data.ID = "123456"
+	data.StartTime = mongostarter.Timestamp{Time: time.Now()}
 	fmt.Println(mapper.Save(&data))
 }
 

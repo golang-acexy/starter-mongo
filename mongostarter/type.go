@@ -2,9 +2,11 @@ package mongostarter
 
 import (
 	"github.com/acexy/golang-toolkit/util/coll"
+	"github.com/acexy/golang-toolkit/util/json"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"time"
 )
 
 type IBaseModel interface {
@@ -22,7 +24,7 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	Collection() *mongo.Collection
 
 	// SelectById 通过主键查询数据 ObjectId类型
-	SelectById(id string, result *T) error
+	SelectById(id string, result *T, notObjectId ...bool) error
 
 	// SelectByIds 通过主键查询数据
 	SelectByIds(ids []string, result *[]*T) (err error)
@@ -139,5 +141,40 @@ func NewOrderBys(orderBy map[string]bool) []*OrderBy {
 			return &OrderBy{Column: key, Desc: value}
 		})
 	}
+	return nil
+}
+
+// Timestamp 对应处理mongo数据类型为IOSDate 转换为时间戳
+type Timestamp json.Timestamp
+
+func (t Timestamp) MarshalBSONValue() (typ byte, data []byte, err error) {
+	if t.IsZero() {
+		return typ, nil, err
+	}
+	valueType, data, err := bson.MarshalValue(bson.DateTime(t.Time.UnixMilli()))
+	typ = byte(valueType)
+	return
+}
+
+func (t *Timestamp) UnmarshalBSONValue(typ byte, data []byte) error {
+	var dataTime time.Time
+	err := bson.UnmarshalValue(bson.Type(typ), data, &dataTime)
+	if err != nil {
+		return err
+	}
+	t.Time = dataTime
+	return nil
+}
+
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	return json.Time2Timestamp(t.Time)
+}
+
+func (t Timestamp) UnmarshalJSON(data []byte) error {
+	formatTime, err := json.Timestamp2Time(data)
+	if err != nil {
+		return err
+	}
+	t.Time = formatTime
 	return nil
 }
