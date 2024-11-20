@@ -16,7 +16,7 @@ import (
 var mongoClient *mongo.Client
 var defaultDatabase string
 
-type MongoStarter struct {
+type MongoConfig struct {
 
 	// 工作数据库
 	Database string
@@ -32,6 +32,10 @@ type MongoStarter struct {
 
 	// 网络压缩算法
 	Compressors []string
+}
+
+type MongoStarter struct {
+	MongoConfig MongoConfig
 
 	MongoSetting *parent.Setting
 
@@ -55,11 +59,11 @@ func (m *MongoStarter) Setting() *parent.Setting {
 }
 
 func (m *MongoStarter) Start() (interface{}, error) {
-	if m.Database != "" {
-		defaultDatabase = m.Database
+	if m.MongoConfig.Database != "" {
+		defaultDatabase = m.MongoConfig.Database
 	}
-	clientOptions := options.Client().ApplyURI(m.MongoUri)
-	if m.EnableLogger {
+	clientOptions := options.Client().ApplyURI(m.MongoConfig.MongoUri)
+	if m.MongoConfig.EnableLogger {
 		monitor := &event.CommandMonitor{
 			Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
 				logger.Logrus().Traceln(evt.CommandName, evt.Command)
@@ -67,13 +71,13 @@ func (m *MongoStarter) Start() (interface{}, error) {
 		}
 		clientOptions.SetMonitor(monitor)
 	}
-	if m.Compressors != nil {
-		clientOptions.SetCompressors(m.Compressors)
+	if m.MongoConfig.Compressors != nil {
+		clientOptions.SetCompressors(m.MongoConfig.Compressors)
 	} else {
 		clientOptions.SetCompressors([]string{"zstd", "zlib", "snappy"})
 	}
-	if m.BsonOpts != nil {
-		clientOptions.SetBSONOptions(m.BsonOpts)
+	if m.MongoConfig.BsonOpts != nil {
+		clientOptions.SetBSONOptions(m.MongoConfig.BsonOpts)
 	}
 
 	if defaultDatabase == "" {

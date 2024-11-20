@@ -16,15 +16,17 @@ var loader *parent.StarterLoader
 func init() {
 	loader = parent.NewStarterLoader([]parent.Starter{
 		&mongostarter.MongoStarter{
-			MongoUri: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
-			//Database: "local",
-			BsonOpts: &options.BSONOptions{
-				UseJSONStructTags:   true,
-				ObjectIDAsHexString: true,
-				OmitZeroStruct:      true,
-				ZeroStructs:         true,
+			MongoConfig: mongostarter.MongoConfig{
+				MongoUri: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
+				//Database: "local",
+				BsonOpts: &options.BSONOptions{
+					UseJSONStructTags:   true,
+					ObjectIDAsHexString: true,
+					OmitZeroStruct:      true,
+					ZeroStructs:         true,
+				},
+				EnableLogger: true,
 			},
-			EnableLogger: true,
 		},
 	})
 	err := loader.Start()
@@ -35,9 +37,10 @@ func init() {
 }
 
 type StartupLog struct {
-	ID       string `bson:"_id,omitempty" json:"id"`
-	Pid      int    `bson:"pid,omitempty" json:"pid"`
-	Hostname string `bson:"hostname,omitempty" json:"hostname"`
+	ID        string                 `bson:"_id,omitempty" json:"id"`
+	Pid       int                    `bson:"pid,omitempty" json:"pid"`
+	Hostname  string                 `bson:"hostname,omitempty" json:"hostname"`
+	StartTime mongostarter.Timestamp `bson:"startTime,omitempty" json:"startTime"`
 }
 
 func TestLoader(t *testing.T) {
