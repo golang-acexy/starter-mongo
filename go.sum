@@ -1,9 +1,3 @@
-github.com/acexy/golang-toolkit v0.0.32 h1:nP386D4Ukig8BY0F9NJRDeoZlkRCArjfqs+KeR7FX+c=
-github.com/acexy/golang-toolkit v0.0.32/go.mod h1:2Yu14VjaHgti1sTg8kB1GQKG2+S/AS/nncczOA9x6gk=
-github.com/acexy/golang-toolkit v0.0.34-0.20241119023622-ae1113fbcea4 h1:II0BhsmI8Z+QfPULagYv1HH9OYRrDTe/q5ACtePVvkw=
-github.com/acexy/golang-toolkit v0.0.34-0.20241119023622-ae1113fbcea4/go.mod h1:CmfHdxJkdvOLpeXXHbFaYenwnpOSucwVjf/1qXOiwMM=
-github.com/acexy/golang-toolkit v0.0.34-0.20241119073050-83296dc6b21a h1:WcL9OHE07G8RXe2lPKUkQsfM6bPwTMjr+ptxkXT8/aY=
-github.com/acexy/golang-toolkit v0.0.34-0.20241119073050-83296dc6b21a/go.mod h1:CmfHdxJkdvOLpeXXHbFaYenwnpOSucwVjf/1qXOiwMM=
 github.com/acexy/golang-toolkit v0.0.35 h1:V/SaS0OYOu8wWWy9LcT/87QcNAFRzexAXAXBoGLzjKE=
 github.com/acexy/golang-toolkit v0.0.35/go.mod h1:TmIEqd809dMZbl0HFQGBDY52xNpYudDDh7IPQElmZUk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
