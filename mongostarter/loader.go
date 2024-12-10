@@ -128,7 +128,7 @@ func RawMongoClient() *mongo.Client {
 }
 
 // RawDatabase 获取原始的 mongo.Database 原生能力
-// database 为空则使用默认的 database
+// database 为空则使用默认初始化指定的database
 func RawDatabase(database ...string) *mongo.Database {
 	var db string
 	if len(database) > 0 {
