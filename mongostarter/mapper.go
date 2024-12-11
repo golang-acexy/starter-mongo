@@ -3,7 +3,6 @@ package mongostarter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/acexy/golang-toolkit/util/coll"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -66,75 +65,6 @@ func setPage(opt **options.FindOptionsBuilder, pageNumber, pageSize int) {
 	(*opt).SetSkip(int64(skip)).SetLimit(int64(pageSize))
 }
 
-func checkSingleResult(singleResult *mongo.SingleResult, result interface{}) error {
-	if singleResult.Err() != nil {
-		return singleResult.Err()
-	}
-	return singleResult.Decode(result)
-}
-
-func checkMultipleResult(cursor *mongo.Cursor, err error, result interface{}) error {
-	if err != nil {
-		return err
-	}
-	defer cursor.Close(context.Background())
-	return cursor.All(context.Background(), result)
-}
-
-func checkSingleSaveResult(result *mongo.InsertOneResult, err error) (string, error) {
-	if err != nil {
-		return "", err
-	}
-	if !result.Acknowledged {
-		return "", errors.New("not acknowledged")
-	}
-	objectId, ok := result.InsertedID.(bson.ObjectID)
-	if ok {
-		return objectId.Hex(), nil
-	}
-	return fmt.Sprintf("%v", result.InsertedID), nil
-}
-
-func checkMultipleSaveResult(result *mongo.InsertManyResult, err error) ([]string, error) {
-	if err != nil {
-		return nil, err
-	}
-	if !result.Acknowledged {
-		return nil, errors.New("not acknowledged")
-	}
-	objectIds := result.InsertedIDs
-	var ids []string
-	for _, v := range objectIds {
-		objectId, ok := v.(bson.ObjectID)
-		if ok {
-			ids = append(ids, objectId.Hex())
-		} else {
-			ids = append(ids, fmt.Sprintf("%v", v))
-		}
-	}
-	return ids, nil
-}
-
-func checkUpdateResult(result *mongo.UpdateResult, err error) (bool, error) {
-	if err != nil {
-		return false, err
-	}
-	if !result.Acknowledged {
-		return false, errors.New("not acknowledged")
-	}
-	return result.ModifiedCount > 0, nil
-}
-
-func checkDeleteResult(result *mongo.DeleteResult, err error) (bool, error) {
-	if err != nil {
-		return false, err
-	}
-	if !result.Acknowledged {
-		return false, errors.New("not acknowledged")
-	}
-	return result.DeletedCount > 0, nil
-}
-
 func (b *BaseMapper[T]) Collection() *mongo.Collection {
 	return collection(b.Value.CollectionName())
 }
@@ -150,7 +80,7 @@ func (b *BaseMapper[T]) SelectById(id string, result *T, notObjectId ...bool) er
 		}
 		queryId = hex
 	}
-	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
+	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
 }
 
 func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
@@ -170,19 +100,19 @@ func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
 		return hex
 	})
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), bson.M{"_id": bson.M{"$in": hexes}})
-	return checkMultipleResult(cursor, err, result)
+	return CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns ...string) error {
-	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
+	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
 func (b *BaseMapper[T]) SelectOneByBson(condition bson.M, result *T, specifyColumns ...string) error {
-	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
+	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
 func (b *BaseMapper[T]) SelectOneByCollection(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
-	return checkSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), filter, opts...), result)
+	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), filter, opts...), result)
 }
 
 func (b *BaseMapper[T]) SelectByCond(condition *T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
@@ -191,7 +121,7 @@ func (b *BaseMapper[T]) SelectByCond(condition *T, orderBy []*OrderBy, result *[
 		setOrderBy(&opt, orderBy)
 	}
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
-	return checkMultipleResult(cursor, err, result)
+	return CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) SelectByBson(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
@@ -200,12 +130,12 @@ func (b *BaseMapper[T]) SelectByBson(condition bson.M, orderBy []*OrderBy, resul
 		setOrderBy(&opt, orderBy)
 	}
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
-	return checkMultipleResult(cursor, err, result)
+	return CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) SelectByCollection(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), filter, opts...)
-	return checkMultipleResult(cursor, err, result)
+	return CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) CountByCond(condition *T) (int64, error) {
@@ -234,7 +164,7 @@ func (b *BaseMapper[T]) SelectPageByCond(condition *T, orderBy []*OrderBy, pageN
 	}
 	setPage(&opt, pageNumber, pageSize)
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
-	return total, checkMultipleResult(cursor, err, result)
+	return total, CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error) {
@@ -251,7 +181,7 @@ func (b *BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, p
 	}
 	setPage(&opt, pageNumber, pageSize)
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
-	return total, checkMultipleResult(cursor, err, result)
+	return total, CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) SelectPageByCollection(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
@@ -277,31 +207,31 @@ func (b *BaseMapper[T]) SelectPageByCollection(filter interface{}, orderBy []*Or
 	skip := (pageNumber - 1) * pageSize
 	opts = append(opts, options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize)))
 	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), filter, opts...)
-	return total, checkMultipleResult(cursor, err, result)
+	return total, CheckMultipleResult(cursor, err, result)
 }
 
 func (b *BaseMapper[T]) Save(entity *T) (string, error) {
-	return checkSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
+	return CheckSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
 }
 
 func (b *BaseMapper[T]) SaveByBson(entity bson.M) (string, error) {
-	return checkSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
+	return CheckSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
 }
 
 func (b *BaseMapper[T]) SaveByCollection(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
-	return checkSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), document, opts...))
+	return CheckSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), document, opts...))
 }
 
 func (b *BaseMapper[T]) SaveBatch(entity *[]*T) ([]string, error) {
-	return checkMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
+	return CheckMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
 }
 
 func (b *BaseMapper[T]) SaveBatchByBson(entity *[]*bson.M) ([]string, error) {
-	return checkMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
+	return CheckMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
 }
 
 func (b *BaseMapper[T]) SaveBatchByCollection(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
-	return checkMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), documents, opts...))
+	return CheckMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), documents, opts...))
 }
 
 func (b *BaseMapper[T]) UpdateById(update *T, id string) (bool, error) {
@@ -309,7 +239,7 @@ func (b *BaseMapper[T]) UpdateById(update *T, id string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
 }
 
 func (b *BaseMapper[T]) UpdateByIdUseBson(update bson.M, id string) (bool, error) {
@@ -317,23 +247,23 @@ func (b *BaseMapper[T]) UpdateByIdUseBson(update bson.M, id string) (bool, error
 	if err != nil {
 		return false, err
 	}
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
 }
 
 func (b *BaseMapper[T]) UpdateOneByCond(update, condition *T) (bool, error) {
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
 func (b *BaseMapper[T]) UpdateOneByCondUseBson(update, condition bson.M) (bool, error) {
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
 func (b *BaseMapper[T]) UpdateByCond(update, condition *T) (bool, error) {
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
 func (b *BaseMapper[T]) UpdateByCondUseBson(update, condition bson.M) (bool, error) {
-	return checkUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
 func (b *BaseMapper[T]) DeleteById(id string) (bool, error) {
@@ -341,21 +271,21 @@ func (b *BaseMapper[T]) DeleteById(id string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), bson.M{"_id": hex}))
+	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), bson.M{"_id": hex}))
 }
 
 func (b *BaseMapper[T]) DeleteOneByCond(condition *T) (bool, error) {
-	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
+	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
 }
 
 func (b *BaseMapper[T]) DeleteOneByCondUseBson(condition bson.M) (bool, error) {
-	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
+	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
 }
 
 func (b *BaseMapper[T]) DeleteByCond(condition *T) (bool, error) {
-	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
+	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
 }
 
 func (b *BaseMapper[T]) DeleteByCondUseBson(condition bson.M) (bool, error) {
-	return checkDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
+	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
 }
