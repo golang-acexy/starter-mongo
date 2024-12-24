@@ -137,8 +137,8 @@ func NewOrderBy(column string, desc bool) []*OrderBy {
 // NewOrderBys 新增多个排序规则
 func NewOrderBys(orderBy map[string]bool) []*OrderBy {
 	if len(orderBy) > 0 {
-		return coll.MapToSlice(orderBy, func(key string, value bool) *OrderBy {
-			return &OrderBy{Column: key, Desc: value}
+		return coll.MapFilterToSlice(orderBy, func(key string, value bool) (*OrderBy, bool) {
+			return &OrderBy{Column: key, Desc: value}, true
 		})
 	}
 	return nil
