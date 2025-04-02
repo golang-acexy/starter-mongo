@@ -20,26 +20,37 @@ type MongoConfig struct {
 
 	// 工作数据库
 	Database string
-
 	// Mongo 链接地址串 如果设置了则忽略上面的配置
 	MongoUri string
-
 	// 设置默认的Bson选项
 	BsonOpts *options.BSONOptions
-
 	// 开启详细日志
 	EnableLogger bool
-
 	// 网络压缩算法
 	Compressors []string
+
+	InitFunc func(instance *mongo.Client)
 }
 
 type MongoStarter struct {
-	MongoConfig MongoConfig
+	Config     MongoConfig
+	LazyConfig func() MongoConfig
 
+	config       *MongoConfig
 	MongoSetting *parent.Setting
+}
 
-	InitFunc func(instance *mongo.Client)
+func (m *MongoStarter) getConfig() *MongoConfig {
+	if m.config == nil {
+		var config MongoConfig
+		if m.LazyConfig != nil {
+			config = m.LazyConfig()
+		} else {
+			config = m.Config
+		}
+		m.config = &config
+	}
+	return m.config
 }
 
 func (m *MongoStarter) Setting() *parent.Setting {
@@ -52,18 +63,20 @@ func (m *MongoStarter) Setting() *parent.Setting {
 		false,
 		time.Second*30,
 		func(instance interface{}) {
-			if m.InitFunc != nil {
-				m.InitFunc(instance.(*mongo.Client))
+			config := m.getConfig()
+			if config.InitFunc != nil {
+				config.InitFunc(instance.(*mongo.Client))
 			}
 		})
 }
 
 func (m *MongoStarter) Start() (interface{}, error) {
-	if m.MongoConfig.Database != "" {
-		defaultDatabase = m.MongoConfig.Database
+	config := m.getConfig()
+	if config.Database != "" {
+		defaultDatabase = config.Database
 	}
-	clientOptions := options.Client().ApplyURI(m.MongoConfig.MongoUri)
-	if m.MongoConfig.EnableLogger {
+	clientOptions := options.Client().ApplyURI(config.MongoUri)
+	if config.EnableLogger {
 		monitor := &event.CommandMonitor{
 			Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
 				logger.Logrus().Traceln(evt.CommandName, evt.Command)
@@ -71,15 +84,14 @@ func (m *MongoStarter) Start() (interface{}, error) {
 		}
 		clientOptions.SetMonitor(monitor)
 	}
-	if m.MongoConfig.Compressors != nil {
-		clientOptions.SetCompressors(m.MongoConfig.Compressors)
+	if config.Compressors != nil {
+		clientOptions.SetCompressors(config.Compressors)
 	} else {
 		clientOptions.SetCompressors([]string{"zstd", "zlib", "snappy"})
 	}
-	if m.MongoConfig.BsonOpts != nil {
-		clientOptions.SetBSONOptions(m.MongoConfig.BsonOpts)
+	if config.BsonOpts != nil {
+		clientOptions.SetBSONOptions(config.BsonOpts)
 	}
-
 	if defaultDatabase == "" {
 		// 从 URI 的路径部分提取数据库名称（如果有）
 		parsedURI, err := url.Parse(clientOptions.GetURI())
@@ -90,9 +102,7 @@ func (m *MongoStarter) Start() (interface{}, error) {
 				defaultDatabase = database
 			}
 		}
-
 	}
-
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
