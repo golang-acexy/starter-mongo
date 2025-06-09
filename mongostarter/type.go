@@ -130,8 +130,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// Insert 保存数据
 	Insert(entity *T) (string, error)
 
-	// InsertUseBson 保存数据
-	InsertUseBson(entity bson.M) (string, error)
+	// InsertByBson 保存数据
+	InsertByBson(entity bson.M) (string, error)
 
 	// InsertByColl 保存数据 使用Collection原生能力
 	InsertByColl(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error)
