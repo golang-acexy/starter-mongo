@@ -78,8 +78,8 @@ func (t Timestamp) UnmarshalJSON(data []byte) error {
 
 type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 
-	// CollectionWithTableName 获取对应的原始Collection操作能力
-	CollectionWithTableName() *mongo.Collection
+	// CollWithTableName 获取对应的原始Collection操作能力
+	CollWithTableName() *mongo.Collection
 
 	// SelectById 通过主键查询数据 ObjectId类型
 	SelectById(id string, result *T, notObjectId ...bool) error
@@ -95,8 +95,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// specifyColumns 需要指定只查询的数据库字段
 	SelectOneByBson(condition bson.M, result *T, specifyColumns ...string) error
 
-	// SelectOneByCollection 通过原生Collection查询能力
-	SelectOneByCollection(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error
+	// SelectOneByColl 通过原生Collection查询能力
+	SelectOneByColl(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error
 
 	// SelectByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
@@ -106,8 +106,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// specifyColumns 需要指定只查询的数据库字段
 	SelectByBson(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error
 
-	// SelectByCollection 通过原生Collection查询能力
-	SelectByCollection(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error
+	// SelectByColl 通过原生Collection查询能力
+	SelectByColl(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error
 
 	// CountByCond 通过条件查询数据总数
 	CountByCond(condition *T) (int64, error)
@@ -115,8 +115,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// CountByBson 通过条件查询数据总数
 	CountByBson(condition bson.M) (int64, error)
 
-	// CountByCollection 通过原生Collection查询能力
-	CountByCollection(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error)
+	// CountByColl 通过原生Collection查询能力
+	CountByColl(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error)
 
 	// SelectPageByCond 分页查询 pageNumber >= 1
 	SelectPageByCond(condition *T, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error)
@@ -124,26 +124,26 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// SelectPageByBson 分页查询 pageNumber >= 1
 	SelectPageByBson(condition bson.M, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error)
 
-	// SelectPageByCollection 分页查询 pageNumber >= 1
-	SelectPageByCollection(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error)
+	// SelectPageByColl 分页查询 pageNumber >= 1
+	SelectPageByColl(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error)
 
 	// Insert 保存数据
 	Insert(entity *T) (string, error)
 
-	// InsertByBson 保存数据
-	InsertByBson(entity bson.M) (string, error)
+	// InsertUseBson 保存数据
+	InsertUseBson(entity bson.M) (string, error)
 
-	// InsertByCollection 保存数据 使用Collection原生能力
-	InsertByCollection(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error)
+	// InsertByColl 保存数据 使用Collection原生能力
+	InsertByColl(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error)
 
 	// InsertBatch 批量保存数据
-	InsertBatch(entity *[]*T) ([]string, error)
+	InsertBatch(entities *[]*T) ([]string, error)
 
 	// InsertBatchByBson 批量保存数据
-	InsertBatchByBson(entity *[]*bson.M) ([]string, error)
+	InsertBatchByBson(entities bson.A) ([]string, error)
 
-	// InsertBatchByCollection 批量保存数据
-	InsertBatchByCollection(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error)
+	// InsertBatchByColl 批量保存数据
+	InsertBatchByColl(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error)
 
 	// UpdateById 根据主键更新数据 id ObjectId hex
 	UpdateById(update *T, id string) (bool, error)

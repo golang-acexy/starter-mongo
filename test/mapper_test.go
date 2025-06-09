@@ -73,16 +73,15 @@ func TestSave(t *testing.T) {
 
 func TestSaveBatch(t *testing.T) {
 	data := []*StartupLog{
-		{Hostname: "998a29f641e61111"},
-		{Hostname: "998a29f641e11111"},
+		{Hostname: "1"},
+		{Hostname: "2"},
 	}
 	fmt.Println(mapper.InsertBatch(&data))
-
-	many := []*bson.M{
-		{"hostname": "123456"},
-		{"hostname": "654321"},
+	many := bson.A{
+		bson.M{"hostname": "3"},
+		bson.D{bson.E{Key: "hostname", Value: "4"}},
 	}
-	fmt.Println(mapper.InsertBatchByBson(&many))
+	fmt.Println(mapper.InsertBatchByBson(many))
 
 }
 
@@ -91,7 +90,7 @@ func TestPage(t *testing.T) {
 	total, err := mapper.SelectPageByCond(&StartupLog{}, nil, 1, 2, &dataList)
 	fmt.Println(total, err)
 	fmt.Println(json.ToJsonFormat(dataList))
-	total, err = mapper.SelectPageByCollection(bson.M{"hostname": "998a29f641e6"}, nil, 2, 2, &dataList)
+	total, err = mapper.SelectPageByColl(bson.M{"hostname": "998a29f641e6"}, nil, 2, 2, &dataList)
 	fmt.Println(total, err)
 	fmt.Println(json.ToJsonFormat(dataList))
 }

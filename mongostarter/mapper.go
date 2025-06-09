@@ -66,7 +66,7 @@ func setPage(opt **options.FindOptionsBuilder, pageNumber, pageSize int) {
 }
 
 // CollectionWithTableName 获取对应的原始Collection操作能力 已限定集合名
-func (b *BaseMapper[T]) CollectionWithTableName() *mongo.Collection {
+func (b *BaseMapper[T]) CollWithTableName() *mongo.Collection {
 	return collection(b.model.CollectionName())
 }
 
@@ -112,14 +112,14 @@ func (b *BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns 
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
-// SelectOneByBson 通过条件查询
+// SelectOneUseBson 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
 func (b *BaseMapper[T]) SelectOneByBson(condition bson.M, result *T, specifyColumns ...string) error {
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
 // SelectOneByCollection 通过原生Collection查询能力
-func (b *BaseMapper[T]) SelectOneByCollection(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
+func (b *BaseMapper[T]) SelectOneByColl(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), filter, opts...), result)
 }
 
@@ -146,7 +146,7 @@ func (b *BaseMapper[T]) SelectByBson(condition bson.M, orderBy []*OrderBy, resul
 }
 
 // SelectByCollection 通过原生Collection查询能力
-func (b *BaseMapper[T]) SelectByCollection(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
+func (b *BaseMapper[T]) SelectByColl(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
 	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), filter, opts...)
 	return CheckMultipleResult(cursor, err, result)
 }
@@ -162,7 +162,7 @@ func (b *BaseMapper[T]) CountByBson(condition bson.M) (int64, error) {
 }
 
 // CountByCollection 通过原生Collection查询能力
-func (b *BaseMapper[T]) CountByCollection(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error) {
+func (b *BaseMapper[T]) CountByColl(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error) {
 	return collection(b.model.CollectionName()).CountDocuments(context.Background(), filter, opts...)
 }
 
@@ -203,11 +203,11 @@ func (b *BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, p
 }
 
 // SelectPageByCollection 分页查询 pageNumber >= 1
-func (b *BaseMapper[T]) SelectPageByCollection(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
+func (b *BaseMapper[T]) SelectPageByColl(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
 	if pageNumber <= 0 || pageSize <= 0 {
 		return 0, errors.New("pageNumber or pageSize <= 0")
 	}
-	total, err = b.CountByCollection(filter)
+	total, err = b.CountByColl(filter)
 	if err != nil {
 		return 0, err
 	}
@@ -234,28 +234,28 @@ func (b *BaseMapper[T]) Insert(entity *T) (string, error) {
 	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), entity))
 }
 
-// InsertByBson 保存数据
-func (b *BaseMapper[T]) InsertByBson(entity bson.M) (string, error) {
+// InsertUseBson 保存数据
+func (b *BaseMapper[T]) InsertUseBson(entity bson.M) (string, error) {
 	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), entity))
 }
 
 // InsertByCollection 保存数据 使用Collection原生能力
-func (b *BaseMapper[T]) InsertByCollection(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
+func (b *BaseMapper[T]) InsertByColl(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
 	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), document, opts...))
 }
 
 // InsertBatch 批量保存数据
-func (b *BaseMapper[T]) InsertBatch(entity *[]*T) ([]string, error) {
-	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), *entity))
+func (b *BaseMapper[T]) InsertBatch(entities *[]*T) ([]string, error) {
+	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), *entities))
 }
 
-// InsertBatchByBson 批量保存数据
-func (b *BaseMapper[T]) InsertBatchByBson(entity *[]*bson.M) ([]string, error) {
-	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), *entity))
+// InsertBatchUseBson 批量保存数据
+func (b *BaseMapper[T]) InsertBatchByBson(entities bson.A) ([]string, error) {
+	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), entities))
 }
 
 // InsertBatchByCollection 批量保存数据
-func (b *BaseMapper[T]) InsertBatchByCollection(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
+func (b *BaseMapper[T]) InsertBatchByColl(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
 	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), documents, opts...))
 }
 
