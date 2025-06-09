@@ -65,10 +65,10 @@ func TestCount(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	data := StartupLog{Hostname: "998a29f641e6"}
-	fmt.Println(mapper.Save(&data))
+	fmt.Println(mapper.Insert(&data))
 	data.ID = "123456"
 	data.StartTime = mongostarter.Timestamp{Time: time.Now()}
-	fmt.Println(mapper.Save(&data))
+	fmt.Println(mapper.Insert(&data))
 }
 
 func TestSaveBatch(t *testing.T) {
@@ -76,13 +76,13 @@ func TestSaveBatch(t *testing.T) {
 		{Hostname: "998a29f641e61111"},
 		{Hostname: "998a29f641e11111"},
 	}
-	fmt.Println(mapper.SaveBatch(&data))
+	fmt.Println(mapper.InsertBatch(&data))
 
 	many := []*bson.M{
 		{"hostname": "123456"},
 		{"hostname": "654321"},
 	}
-	fmt.Println(mapper.SaveBatchByBson(&many))
+	fmt.Println(mapper.InsertBatchByBson(&many))
 
 }
 
