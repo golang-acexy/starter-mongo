@@ -95,8 +95,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// specifyColumns 需要指定只查询的数据库字段
 	SelectOneByBson(condition bson.M, result *T, specifyColumns ...string) error
 
-	// SelectOneByColl 通过原生Collection查询能力
-	SelectOneByColl(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error
+	// SelectOneByOption 通过原生Collection查询能力
+	SelectOneByOption(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error
 
 	// SelectByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
@@ -106,8 +106,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// specifyColumns 需要指定只查询的数据库字段
 	SelectByBson(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error
 
-	// SelectByColl 通过原生Collection查询能力
-	SelectByColl(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error
+	// SelectByOption 通过原生Collection查询能力
+	SelectByOption(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error
 
 	// CountByCond 通过条件查询数据总数
 	CountByCond(condition *T) (int64, error)
@@ -115,8 +115,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// CountByBson 通过条件查询数据总数
 	CountByBson(condition bson.M) (int64, error)
 
-	// CountByColl 通过原生Collection查询能力
-	CountByColl(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error)
+	// CountByOption 通过原生Collection查询能力
+	CountByOption(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error)
 
 	// SelectPageByCond 分页查询 pageNumber >= 1
 	SelectPageByCond(condition *T, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error)

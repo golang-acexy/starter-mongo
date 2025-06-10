@@ -133,8 +133,8 @@ func (b *BaseMapper[T]) SelectOneByBson(condition bson.M, result *T, specifyColu
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
-// SelectOneByColl 通过原生Collection查询能力
-func (b *BaseMapper[T]) SelectOneByColl(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
+// SelectOneByOption 通过原生Collection查询能力
+func (b *BaseMapper[T]) SelectOneByOption(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), filter, opts...), result)
 }
 
@@ -160,8 +160,8 @@ func (b *BaseMapper[T]) SelectByBson(condition bson.M, orderBy []*OrderBy, resul
 	return CheckMultipleResult(cursor, err, result)
 }
 
-// SelectByColl 通过原生Collection查询能力
-func (b *BaseMapper[T]) SelectByColl(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
+// SelectByOption 通过原生Collection查询能力
+func (b *BaseMapper[T]) SelectByOption(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
 	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), filter, opts...)
 	return CheckMultipleResult(cursor, err, result)
 }
@@ -176,8 +176,8 @@ func (b *BaseMapper[T]) CountByBson(condition bson.M) (int64, error) {
 	return collection(b.model.CollectionName()).CountDocuments(context.Background(), condition)
 }
 
-// CountByColl 通过原生Collection查询能力
-func (b *BaseMapper[T]) CountByColl(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error) {
+// CountByOption 通过原生Collection查询能力
+func (b *BaseMapper[T]) CountByOption(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error) {
 	return collection(b.model.CollectionName()).CountDocuments(context.Background(), filter, opts...)
 }
 
@@ -222,7 +222,7 @@ func (b *BaseMapper[T]) SelectPageByColl(filter interface{}, orderBy []*OrderBy,
 	if pageNumber <= 0 || pageSize <= 0 {
 		return 0, errors.New("pageNumber or pageSize <= 0")
 	}
-	total, err = b.CountByColl(filter)
+	total, err = b.CountByOption(filter)
 	if err != nil {
 		return 0, err
 	}
