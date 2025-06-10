@@ -124,8 +124,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// SelectPageByBson 分页查询 pageNumber >= 1
 	SelectPageByBson(condition bson.M, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error)
 
-	// SelectPageByColl 分页查询 pageNumber >= 1
-	SelectPageByColl(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error)
+	// SelectPageByOption 分页查询 pageNumber >= 1
+	SelectPageByOption(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error)
 
 	// Insert 保存数据
 	Insert(entity *T) (string, error)
@@ -146,10 +146,10 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	InsertBatchWithOption(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error)
 
 	// UpdateById 根据主键更新数据 id ObjectId hex
-	UpdateById(update *T, id string) (bool, error)
+	UpdateById(update *T, id any, notObjectId ...bool) (bool, error)
 
 	// UpdateByIdUseBson 根据主键更新数据
-	UpdateByIdUseBson(update bson.M, id string) (bool, error)
+	UpdateByIdUseBson(update bson.M, id any, notObjectId ...bool) (bool, error)
 
 	// UpdateOneByCond 通过条件更新单条数据
 	UpdateOneByCond(update, condition *T) (bool, error)

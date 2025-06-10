@@ -119,7 +119,7 @@ func TestPage(t *testing.T) {
 	total, err := mapper.SelectPageByCond(&StartupLog{}, nil, 1, 2, &dataList)
 	fmt.Println(total, err)
 	fmt.Println(json.ToJsonFormat(dataList))
-	total, err = mapper.SelectPageByColl(bson.M{"hostname": "998a29f641e6"}, nil, 2, 2, &dataList)
+	total, err = mapper.SelectPageByOption(bson.M{"hostname": "998a29f641e6"}, nil, 2, 2, &dataList)
 	fmt.Println(total, err)
 	fmt.Println(json.ToJsonFormat(dataList))
 }

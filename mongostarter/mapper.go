@@ -72,20 +72,9 @@ func (b *BaseMapper[T]) CollWithTableName() *mongo.Collection {
 
 // SelectById 通过主键查询数据 ObjectId类型 匹配_id字段 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
 func (b *BaseMapper[T]) SelectById(id any, result *T, notObjectId ...bool) error {
-	var queryId interface{}
-	if len(notObjectId) > 0 && notObjectId[0] {
-		queryId = id
-	} else {
-		str, ok := id.(string)
-		if !ok {
-			queryId = id
-		} else {
-			hex, err := bson.ObjectIDFromHex(str)
-			if err != nil {
-				return err
-			}
-			queryId = hex
-		}
+	queryId, err := b.convertId(id, notObjectId...)
+	if err != nil {
+		return err
 	}
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
 }
@@ -217,8 +206,8 @@ func (b *BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, p
 	return total, CheckMultipleResult(cursor, err, result)
 }
 
-// SelectPageByColl 分页查询 pageNumber >= 1
-func (b *BaseMapper[T]) SelectPageByColl(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
+// SelectPageByOption 分页查询 pageNumber >= 1
+func (b *BaseMapper[T]) SelectPageByOption(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
 	if pageNumber <= 0 || pageSize <= 0 {
 		return 0, errors.New("pageNumber or pageSize <= 0")
 	}
@@ -274,22 +263,41 @@ func (b *BaseMapper[T]) InsertBatchWithOption(documents interface{}, opts ...opt
 	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), documents, opts...))
 }
 
+func (b *BaseMapper[T]) convertId(id any, notObjectId ...bool) (any, error) {
+	var queryId any
+	if len(notObjectId) > 0 && notObjectId[0] {
+		queryId = id
+	} else {
+		idString, ok := id.(string)
+		if ok {
+			hex, err := bson.ObjectIDFromHex(idString)
+			if err != nil {
+				return false, err
+			}
+			queryId = hex
+		} else {
+			queryId = id
+		}
+	}
+	return queryId, nil
+}
+
 // UpdateById 根据主键更新数据 id ObjectId hex
-func (b *BaseMapper[T]) UpdateById(update *T, id string) (bool, error) {
-	hex, err := bson.ObjectIDFromHex(id)
+func (b *BaseMapper[T]) UpdateById(update *T, id any, notObjectId ...bool) (bool, error) {
+	queryId, err := b.convertId(id, notObjectId...)
 	if err != nil {
 		return false, err
 	}
-	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateByID(context.Background(), queryId, bson.M{"$set": update}))
 }
 
 // UpdateByIdUseBson 根据主键更新数据
-func (b *BaseMapper[T]) UpdateByIdUseBson(update bson.M, id string) (bool, error) {
-	hex, err := bson.ObjectIDFromHex(id)
+func (b *BaseMapper[T]) UpdateByIdUseBson(update bson.M, id any, notObjectId ...bool) (bool, error) {
+	queryId, err := b.convertId(id, notObjectId...)
 	if err != nil {
 		return false, err
 	}
-	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateByID(context.Background(), queryId, bson.M{"$set": update}))
 }
 
 // UpdateOneByCond 通过条件更新单条数据
