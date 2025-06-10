@@ -36,13 +36,6 @@ func init() {
 	}
 }
 
-type StartupLog struct {
-	ID        string                 `bson:"_id,omitempty" json:"id"`
-	Pid       int                    `bson:"pid,omitempty" json:"pid"`
-	Hostname  string                 `bson:"hostname,omitempty" json:"hostname"`
-	StartTime mongostarter.Timestamp `bson:"startTime,omitempty" json:"startTime"`
-}
-
 func TestLoader(t *testing.T) {
 	logColl := mongostarter.RawCollection("startup_log")
 	count, _ := logColl.CountDocuments(context.Background(), bson.D{})

@@ -9,6 +9,20 @@ import (
 	"time"
 )
 
+type StartupLog struct {
+	ID        string                 `bson:"_id,omitempty" json:"id"`
+	Pid       int                    `bson:"pid,omitempty" json:"pid"`
+	Hostname  string                 `bson:"hostname,omitempty" json:"hostname"`
+	StartTime mongostarter.Timestamp `bson:"startTime,omitempty" json:"startTime"`
+}
+
+type StartupLog1 struct {
+	ID        bool                   `bson:"_id,omitempty" json:"id"`
+	Pid       int                    `bson:"pid,omitempty" json:"pid"`
+	Hostname  string                 `bson:"hostname,omitempty" json:"hostname"`
+	StartTime mongostarter.Timestamp `bson:"startTime,omitempty" json:"startTime"`
+}
+
 func (StartupLog) CollectionName() string {
 	return "startup_log"
 }
@@ -17,18 +31,33 @@ type StartupLogMapper struct {
 	mongostarter.BaseMapper[StartupLog]
 }
 
+func (StartupLog1) CollectionName() string {
+	return "startup_log"
+}
+
+type StartupLogMapper1 struct {
+	mongostarter.BaseMapper[StartupLog1]
+}
+
 var mapper = StartupLogMapper{}
+var mapper1 = StartupLogMapper1{}
 
 func TestSelectById(t *testing.T) {
 	var log StartupLog
-	fmt.Println(mapper.SelectById("123456", &log, true))
+	var log1 StartupLog1
+	fmt.Println(mapper.SelectById("684657eb524cbbb7d422a29b", &log, false))
+	fmt.Println(mapper1.SelectById(true, &log1, true))
 	fmt.Println(json.ToJson(log))
+	fmt.Println(json.ToJson(log1))
 }
 
 func TestSelectByIds(t *testing.T) {
 	var logs []*StartupLog
-	fmt.Println(mapper.SelectByIds([]string{"6733121fe9a67c280557c6d1", "67331275587bf0fa60630627"}, &logs))
+	var logs1 []*StartupLog1
+	fmt.Println(mapper.SelectByIds([]any{"6846578fffc6b1d0c07dd931", "6846578fffc6b1d0c07dd932"}, &logs))
+	fmt.Println(mapper1.SelectByIds([]any{true, false}, &logs1))
 	fmt.Println(json.ToJson(logs))
+	fmt.Println(json.ToJson(logs1))
 }
 
 func TestSelectOne(t *testing.T) {

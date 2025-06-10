@@ -70,23 +70,28 @@ func (b *BaseMapper[T]) CollWithTableName() *mongo.Collection {
 	return collection(b.model.CollectionName())
 }
 
-// SelectById 通过主键查询数据 ObjectId类型
-func (b *BaseMapper[T]) SelectById(id string, result *T, notObjectId ...bool) error {
+// SelectById 通过主键查询数据 ObjectId类型 匹配_id字段 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
+func (b *BaseMapper[T]) SelectById(id any, result *T, notObjectId ...bool) error {
 	var queryId interface{}
 	if len(notObjectId) > 0 && notObjectId[0] {
 		queryId = id
 	} else {
-		hex, err := bson.ObjectIDFromHex(id)
-		if err != nil {
-			return err
+		str, ok := id.(string)
+		if !ok {
+			queryId = id
+		} else {
+			hex, err := bson.ObjectIDFromHex(str)
+			if err != nil {
+				return err
+			}
+			queryId = hex
 		}
-		queryId = hex
 	}
 	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
 }
 
-// SelectByIds 通过主键查询数据
-func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
+// SelectByIds 通过主键查询数据 匹配_id字段 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
+func (b *BaseMapper[T]) SelectByIds(ids []any, result *[]*T, notObjectId ...bool) (err error) {
 	if len(ids) == 0 {
 		return errors.New("ids is empty")
 	}
@@ -95,14 +100,24 @@ func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
 			err = r.(error)
 		}
 	}()
-	hexes := coll.SliceCollect(ids, func(id string) bson.ObjectID {
-		hex, err := bson.ObjectIDFromHex(id)
-		if err != nil {
-			panic(err)
-		}
-		return hex
-	})
-	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), bson.M{"_id": bson.M{"$in": hexes}})
+	var queryIDs []any
+	if len(notObjectId) > 0 && notObjectId[0] {
+		queryIDs = ids
+	} else {
+		queryIDs = coll.SliceCollect(ids, func(id any) any {
+			str, ok := id.(string)
+			if !ok {
+				return id
+			} else {
+				hex, err := bson.ObjectIDFromHex(str)
+				if err != nil {
+					panic(err)
+				}
+				return hex
+			}
+		})
+	}
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), bson.M{"_id": bson.M{"$in": queryIDs}})
 	return CheckMultipleResult(cursor, err, result)
 }
 
@@ -239,8 +254,8 @@ func (b *BaseMapper[T]) InsertByBson(entity bson.M) (string, error) {
 	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), entity))
 }
 
-// InsertByColl 保存数据 使用Collection原生能力
-func (b *BaseMapper[T]) InsertByColl(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
+// InsertWithOption 保存数据 使用Collection原生能力
+func (b *BaseMapper[T]) InsertWithOption(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
 	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), document, opts...))
 }
 
@@ -255,7 +270,7 @@ func (b *BaseMapper[T]) InsertBatchByBson(entities bson.A) ([]string, error) {
 }
 
 // InsertBatchByColl 批量保存数据
-func (b *BaseMapper[T]) InsertBatchByColl(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
+func (b *BaseMapper[T]) InsertBatchWithOption(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
 	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), documents, opts...))
 }
 

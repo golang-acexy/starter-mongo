@@ -81,11 +81,11 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// CollWithTableName 获取对应的原始Collection操作能力
 	CollWithTableName() *mongo.Collection
 
-	// SelectById 通过主键查询数据 ObjectId类型
-	SelectById(id string, result *T, notObjectId ...bool) error
+	// SelectById 通过主键查询数据 ObjectId类型 匹配_id 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
+	SelectById(id any, result *T, notObjectId ...bool) error
 
-	// SelectByIds 通过主键查询数据
-	SelectByIds(ids []string, result *[]*T) (err error)
+	// SelectByIds 通过主键查询数据 匹配_id 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
+	SelectByIds(ids []any, result *[]*T, notObjectId ...bool) (err error)
 
 	// SelectOneByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
@@ -133,8 +133,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// InsertByBson 保存数据
 	InsertByBson(entity bson.M) (string, error)
 
-	// InsertByColl 保存数据 使用Collection原生能力
-	InsertByColl(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error)
+	// InsertWithOption 保存数据
+	InsertWithOption(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error)
 
 	// InsertBatch 批量保存数据
 	InsertBatch(entities *[]*T) ([]string, error)
@@ -142,8 +142,8 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	// InsertBatchByBson 批量保存数据
 	InsertBatchByBson(entities bson.A) ([]string, error)
 
-	// InsertBatchByColl 批量保存数据
-	InsertBatchByColl(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error)
+	// InsertBatchWithOption 批量保存数据
+	InsertBatchWithOption(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error)
 
 	// UpdateById 根据主键更新数据 id ObjectId hex
 	UpdateById(update *T, id string) (bool, error)
