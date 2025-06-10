@@ -321,12 +321,12 @@ func (b *BaseMapper[T]) UpdateByCondUseBson(update, condition bson.M) (bool, err
 }
 
 // DeleteById 根据主键删除数据
-func (b *BaseMapper[T]) DeleteById(id string) (bool, error) {
-	hex, err := bson.ObjectIDFromHex(id)
+func (b *BaseMapper[T]) DeleteById(id any, notObjectId ...bool) (bool, error) {
+	queryId, err := b.convertId(id, notObjectId...)
 	if err != nil {
 		return false, err
 	}
-	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteOne(context.Background(), bson.M{"_id": hex}))
+	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteOne(context.Background(), bson.M{"_id": queryId}))
 }
 
 // DeleteOneByCond 通过条件删除数据

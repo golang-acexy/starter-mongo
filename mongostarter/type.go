@@ -164,7 +164,7 @@ type IBaseMapper[B BaseMapper[T], T IBaseModel] interface {
 	UpdateByCondUseBson(update, condition bson.M) (bool, error)
 
 	// DeleteById 根据主键删除数据
-	DeleteById(id string) (bool, error)
+	DeleteById(id any, notObjectId ...bool) (bool, error)
 
 	// DeleteOneByCond 通过条件删除数据
 	DeleteOneByCond(condition *T) (bool, error)
