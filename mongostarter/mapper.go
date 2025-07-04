@@ -65,25 +65,22 @@ func setPage(opt **options.FindOptionsBuilder, pageNumber, pageSize int) {
 	(*opt).SetSkip(int64(skip)).SetLimit(int64(pageSize))
 }
 
-func (b *BaseMapper[T]) Collection() *mongo.Collection {
-	return collection(b.Value.CollectionName())
+// CollWithTableName 获取对应的原始Collection操作能力 已限定集合名
+func (b BaseMapper[T]) CollWithTableName() *mongo.Collection {
+	return collection(b.model.CollectionName())
 }
 
-func (b *BaseMapper[T]) SelectById(id string, result *T, notObjectId ...bool) error {
-	var queryId interface{}
-	if len(notObjectId) > 0 && notObjectId[0] {
-		queryId = id
-	} else {
-		hex, err := bson.ObjectIDFromHex(id)
-		if err != nil {
-			return err
-		}
-		queryId = hex
+// SelectById 通过主键查询数据 ObjectId类型 匹配_id字段 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
+func (b BaseMapper[T]) SelectById(id any, result *T, notObjectId ...bool) error {
+	queryId, err := b.convertId(id, notObjectId...)
+	if err != nil {
+		return err
 	}
-	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
+	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), bson.M{"_id": queryId}), result)
 }
 
-func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
+// SelectByIds 通过主键查询数据 匹配_id字段 当传入的类型是string 将默认让该数据转换为mongo hex 如果string类型非mongo hex 需要将notObjectId设置为true
+func (b BaseMapper[T]) SelectByIds(ids []any, result *[]*T, notObjectId ...bool) (err error) {
 	if len(ids) == 0 {
 		return errors.New("ids is empty")
 	}
@@ -92,65 +89,89 @@ func (b *BaseMapper[T]) SelectByIds(ids []string, result *[]*T) (err error) {
 			err = r.(error)
 		}
 	}()
-	hexes := coll.SliceCollect(ids, func(id string) bson.ObjectID {
-		hex, err := bson.ObjectIDFromHex(id)
-		if err != nil {
-			panic(err)
-		}
-		return hex
-	})
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), bson.M{"_id": bson.M{"$in": hexes}})
+	var queryIDs []any
+	if len(notObjectId) > 0 && notObjectId[0] {
+		queryIDs = ids
+	} else {
+		queryIDs = coll.SliceCollect(ids, func(id any) any {
+			str, ok := id.(string)
+			if !ok {
+				return id
+			} else {
+				hex, err := bson.ObjectIDFromHex(str)
+				if err != nil {
+					panic(err)
+				}
+				return hex
+			}
+		})
+	}
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), bson.M{"_id": bson.M{"$in": queryIDs}})
 	return CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns ...string) error {
-	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
+// SelectOneByCond 通过条件查询
+// specifyColumns 需要指定只查询的数据库字段
+func (b BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns ...string) error {
+	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
-func (b *BaseMapper[T]) SelectOneByBson(condition bson.M, result *T, specifyColumns ...string) error {
-	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
+// SelectOneByBson 通过条件查询
+// specifyColumns 需要指定只查询的数据库字段
+func (b BaseMapper[T]) SelectOneByBson(condition bson.M, result *T, specifyColumns ...string) error {
+	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
 }
 
-func (b *BaseMapper[T]) SelectOneByCollection(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
-	return CheckSingleResult(collection(b.Value.CollectionName()).FindOne(context.Background(), filter, opts...), result)
+// SelectOneByOption 通过原生Collection查询能力
+func (b BaseMapper[T]) SelectOneByOption(filter interface{}, result *T, opts ...options.Lister[options.FindOneOptions]) error {
+	return CheckSingleResult(collection(b.model.CollectionName()).FindOne(context.Background(), filter, opts...), result)
 }
 
-func (b *BaseMapper[T]) SelectByCond(condition *T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
+// SelectByCond 通过条件查询
+// specifyColumns 需要指定只查询的数据库字段
+func (b BaseMapper[T]) SelectByCond(condition *T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
 	opt := specifyColumnsOpt(specifyColumns...)
 	if len(orderBy) > 0 {
 		setOrderBy(&opt, orderBy)
 	}
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), condition, opt)
 	return CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) SelectByBson(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
+// SelectByBson 通过条件查询
+// specifyColumns 需要指定只查询的数据库字段
+func (b BaseMapper[T]) SelectByBson(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
 	opt := specifyColumnsOpt(specifyColumns...)
 	if len(orderBy) > 0 {
 		setOrderBy(&opt, orderBy)
 	}
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), condition, opt)
 	return CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) SelectByCollection(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), filter, opts...)
+// SelectByOption 通过原生Collection查询能力
+func (b BaseMapper[T]) SelectByOption(filter interface{}, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), filter, opts...)
 	return CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) CountByCond(condition *T) (int64, error) {
-	return collection(b.Value.CollectionName()).CountDocuments(context.Background(), condition)
+// CountByCond 通过条件查询数据总数
+func (b BaseMapper[T]) CountByCond(condition *T) (int64, error) {
+	return collection(b.model.CollectionName()).CountDocuments(context.Background(), condition)
 }
 
-func (b *BaseMapper[T]) CountByBson(condition bson.M) (int64, error) {
-	return collection(b.Value.CollectionName()).CountDocuments(context.Background(), condition)
+// CountByBson 通过条件查询数据总数
+func (b BaseMapper[T]) CountByBson(condition bson.M) (int64, error) {
+	return collection(b.model.CollectionName()).CountDocuments(context.Background(), condition)
 }
 
-func (b *BaseMapper[T]) CountByCollection(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error) {
-	return collection(b.Value.CollectionName()).CountDocuments(context.Background(), filter, opts...)
+// CountByOption 通过原生Collection查询能力
+func (b BaseMapper[T]) CountByOption(filter interface{}, opts ...options.Lister[options.CountOptions]) (int64, error) {
+	return collection(b.model.CollectionName()).CountDocuments(context.Background(), filter, opts...)
 }
 
-func (b *BaseMapper[T]) SelectPageByCond(condition *T, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error) {
+// SelectPageByCond 分页查询 pageNumber >= 1
+func (b BaseMapper[T]) SelectPageByCond(condition *T, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error) {
 	if pageNumber <= 0 || pageSize <= 0 {
 		return 0, errors.New("pageNumber or pageSize <= 0")
 	}
@@ -163,11 +184,12 @@ func (b *BaseMapper[T]) SelectPageByCond(condition *T, orderBy []*OrderBy, pageN
 		setOrderBy(&opt, orderBy)
 	}
 	setPage(&opt, pageNumber, pageSize)
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), condition, opt)
 	return total, CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error) {
+// SelectPageByBson 分页查询 pageNumber >= 1
+func (b BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, specifyColumns ...string) (total int64, err error) {
 	if pageNumber <= 0 || pageSize <= 0 {
 		return 0, errors.New("pageNumber or pageSize <= 0")
 	}
@@ -180,15 +202,16 @@ func (b *BaseMapper[T]) SelectPageByBson(condition bson.M, orderBy []*OrderBy, p
 		setOrderBy(&opt, orderBy)
 	}
 	setPage(&opt, pageNumber, pageSize)
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), condition, opt)
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), condition, opt)
 	return total, CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) SelectPageByCollection(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
+// SelectPageByOption 分页查询 pageNumber >= 1
+func (b BaseMapper[T]) SelectPageByOption(filter interface{}, orderBy []*OrderBy, pageNumber, pageSize int, result *[]*T, opts ...options.Lister[options.FindOptions]) (total int64, err error) {
 	if pageNumber <= 0 || pageSize <= 0 {
 		return 0, errors.New("pageNumber or pageSize <= 0")
 	}
-	total, err = b.CountByCollection(filter)
+	total, err = b.CountByOption(filter)
 	if err != nil {
 		return 0, err
 	}
@@ -206,86 +229,122 @@ func (b *BaseMapper[T]) SelectPageByCollection(filter interface{}, orderBy []*Or
 	}
 	skip := (pageNumber - 1) * pageSize
 	opts = append(opts, options.Find().SetSkip(int64(skip)).SetLimit(int64(pageSize)))
-	cursor, err := collection(b.Value.CollectionName()).Find(context.Background(), filter, opts...)
+	cursor, err := collection(b.model.CollectionName()).Find(context.Background(), filter, opts...)
 	return total, CheckMultipleResult(cursor, err, result)
 }
 
-func (b *BaseMapper[T]) Save(entity *T) (string, error) {
-	return CheckSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
+// Insert 保存数据
+func (b BaseMapper[T]) Insert(entity *T) (string, error) {
+	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), entity))
 }
 
-func (b *BaseMapper[T]) SaveByBson(entity bson.M) (string, error) {
-	return CheckSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), entity))
+// InsertByBson 保存数据
+func (b BaseMapper[T]) InsertByBson(entity bson.M) (string, error) {
+	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), entity))
 }
 
-func (b *BaseMapper[T]) SaveByCollection(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
-	return CheckSingleSaveResult(collection(b.Value.CollectionName()).InsertOne(context.Background(), document, opts...))
+// InsertWithOption 保存数据 使用Collection原生能力
+func (b BaseMapper[T]) InsertWithOption(document interface{}, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
+	return CheckSingleSaveResult(collection(b.model.CollectionName()).InsertOne(context.Background(), document, opts...))
 }
 
-func (b *BaseMapper[T]) SaveBatch(entity *[]*T) ([]string, error) {
-	return CheckMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
+// InsertBatch 批量保存数据
+func (b BaseMapper[T]) InsertBatch(entities *[]*T) ([]string, error) {
+	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), *entities))
 }
 
-func (b *BaseMapper[T]) SaveBatchByBson(entity *[]*bson.M) ([]string, error) {
-	return CheckMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), *entity))
+// InsertBatchByBson 批量保存数据
+func (b BaseMapper[T]) InsertBatchByBson(entities bson.A) ([]string, error) {
+	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), entities))
 }
 
-func (b *BaseMapper[T]) SaveBatchByCollection(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
-	return CheckMultipleSaveResult(collection(b.Value.CollectionName()).InsertMany(context.Background(), documents, opts...))
+// InsertBatchByColl 批量保存数据
+func (b BaseMapper[T]) InsertBatchWithOption(documents interface{}, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
+	return CheckMultipleSaveResult(collection(b.model.CollectionName()).InsertMany(context.Background(), documents, opts...))
 }
 
-func (b *BaseMapper[T]) UpdateById(update *T, id string) (bool, error) {
-	hex, err := bson.ObjectIDFromHex(id)
+func (b BaseMapper[T]) convertId(id any, notObjectId ...bool) (any, error) {
+	var queryId any
+	if len(notObjectId) > 0 && notObjectId[0] {
+		queryId = id
+	} else {
+		idString, ok := id.(string)
+		if ok {
+			hex, err := bson.ObjectIDFromHex(idString)
+			if err != nil {
+				return false, err
+			}
+			queryId = hex
+		} else {
+			queryId = id
+		}
+	}
+	return queryId, nil
+}
+
+// UpdateById 根据主键更新数据 id ObjectId hex
+func (b BaseMapper[T]) UpdateById(update *T, id any, notObjectId ...bool) (bool, error) {
+	queryId, err := b.convertId(id, notObjectId...)
 	if err != nil {
 		return false, err
 	}
-	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateByID(context.Background(), queryId, bson.M{"$set": update}))
 }
 
-func (b *BaseMapper[T]) UpdateByIdUseBson(update bson.M, id string) (bool, error) {
-	hex, err := bson.ObjectIDFromHex(id)
+// UpdateByIdUseBson 根据主键更新数据
+func (b BaseMapper[T]) UpdateByIdUseBson(update bson.M, id any, notObjectId ...bool) (bool, error) {
+	queryId, err := b.convertId(id, notObjectId...)
 	if err != nil {
 		return false, err
 	}
-	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateByID(context.Background(), hex, bson.M{"$set": update}))
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateByID(context.Background(), queryId, bson.M{"$set": update}))
 }
 
-func (b *BaseMapper[T]) UpdateOneByCond(update, condition *T) (bool, error) {
-	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
+// UpdateOneByCond 通过条件更新单条数据
+func (b BaseMapper[T]) UpdateOneByCond(update, condition *T) (bool, error) {
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
-func (b *BaseMapper[T]) UpdateOneByCondUseBson(update, condition bson.M) (bool, error) {
-	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
+// UpdateOneByCondUseBson 通过条件更新单条数据
+func (b BaseMapper[T]) UpdateOneByCondUseBson(update, condition bson.M) (bool, error) {
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
-func (b *BaseMapper[T]) UpdateByCond(update, condition *T) (bool, error) {
-	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
+// UpdateByCond 通过条件更新多条数据
+func (b BaseMapper[T]) UpdateByCond(update, condition *T) (bool, error) {
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
-func (b *BaseMapper[T]) UpdateByCondUseBson(update, condition bson.M) (bool, error) {
-	return CheckUpdateResult(collection(b.Value.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
+// UpdateByCondUseBson 通过条件更新单条数据
+func (b BaseMapper[T]) UpdateByCondUseBson(update, condition bson.M) (bool, error) {
+	return CheckUpdateResult(collection(b.model.CollectionName()).UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
-func (b *BaseMapper[T]) DeleteById(id string) (bool, error) {
-	hex, err := bson.ObjectIDFromHex(id)
+// DeleteById 根据主键删除数据
+func (b BaseMapper[T]) DeleteById(id any, notObjectId ...bool) (bool, error) {
+	queryId, err := b.convertId(id, notObjectId...)
 	if err != nil {
 		return false, err
 	}
-	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), bson.M{"_id": hex}))
+	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteOne(context.Background(), bson.M{"_id": queryId}))
 }
 
-func (b *BaseMapper[T]) DeleteOneByCond(condition *T) (bool, error) {
-	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
+// DeleteOneByCond 通过条件删除数据
+func (b BaseMapper[T]) DeleteOneByCond(condition *T) (bool, error) {
+	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteOne(context.Background(), condition))
 }
 
-func (b *BaseMapper[T]) DeleteOneByCondUseBson(condition bson.M) (bool, error) {
-	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteOne(context.Background(), condition))
+// DeleteOneByCondUseBson 通过条件删除数据
+func (b BaseMapper[T]) DeleteOneByCondUseBson(condition bson.M) (bool, error) {
+	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteOne(context.Background(), condition))
 }
 
-func (b *BaseMapper[T]) DeleteByCond(condition *T) (bool, error) {
-	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
+// DeleteByCond 通过条件删除数据
+func (b BaseMapper[T]) DeleteByCond(condition *T) (bool, error) {
+	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteMany(context.Background(), condition))
 }
 
-func (b *BaseMapper[T]) DeleteByCondUseBson(condition bson.M) (bool, error) {
-	return CheckDeleteResult(collection(b.Value.CollectionName()).DeleteMany(context.Background(), condition))
+// DeleteByCondUseBson 通过条件删除数据
+func (b BaseMapper[T]) DeleteByCondUseBson(condition bson.M) (bool, error) {
+	return CheckDeleteResult(collection(b.model.CollectionName()).DeleteMany(context.Background(), condition))
 }
