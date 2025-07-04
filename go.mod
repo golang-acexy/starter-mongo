@@ -4,7 +4,7 @@ go 1.23.5
 
 require (
 	github.com/acexy/golang-toolkit v0.0.49
-	github.com/golang-acexy/starter-parent v0.1.15
+	github.com/golang-acexy/starter-parent v0.1.16
 	go.mongodb.org/mongo-driver/v2 v2.2.2
 )
 

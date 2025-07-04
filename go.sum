@@ -3,8 +3,8 @@ github.com/acexy/golang-toolkit v0.0.49/go.mod h1:XXGTXOj42+WbQfnYlSHwSjW4RGC20u
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/golang-acexy/starter-parent v0.1.15 h1:poaYgB7hNXU1/jgOZrj78if27E+Gd1FTlaupR9qNLnE=
-github.com/golang-acexy/starter-parent v0.1.15/go.mod h1:iWg08DKgDSGqsUjAPPoNghR/8p6zhT3FdEFOygyrSwM=
+github.com/golang-acexy/starter-parent v0.1.16 h1:ruT1FM4BoMO64MbTnrAJsHAhitcRCs5nsv27eqAXfjQ=
+github.com/golang-acexy/starter-parent v0.1.16/go.mod h1:NG/oDFsqTOOKwL4rFxPxokfYeVraGB+qU951La+LTFc=
 github.com/golang/snappy v1.0.0 h1:Oy607GVXHs7RtbggtPBnr2RmDArIsAefDwvrdWvRhGs=
 github.com/golang/snappy v1.0.0/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
