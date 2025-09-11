@@ -3,9 +3,9 @@ module github.com/golang-acexy/starter-mongo
 go 1.23.5
 
 require (
-	github.com/acexy/golang-toolkit v0.0.49
-	github.com/golang-acexy/starter-parent v0.1.16
-	go.mongodb.org/mongo-driver/v2 v2.2.2
+	github.com/acexy/golang-toolkit v0.0.52
+	github.com/golang-acexy/starter-parent v0.1.18
+	go.mongodb.org/mongo-driver/v2 v2.3.0
 )
 
 require (
@@ -16,14 +16,14 @@ require (
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/timandy/routine v1.1.5 // indirect
+	github.com/timandy/routine v1.1.6 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
