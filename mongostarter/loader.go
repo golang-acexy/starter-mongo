@@ -2,15 +2,16 @@ package mongostarter
 
 import (
 	"context"
+	"net/url"
+	"strings"
+	"time"
+
 	"github.com/acexy/golang-toolkit/logger"
 	"github.com/golang-acexy/starter-parent/parent"
 	"go.mongodb.org/mongo-driver/v2/event"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
-	"net/url"
-	"strings"
-	"time"
 )
 
 var mongoClient *mongo.Client
