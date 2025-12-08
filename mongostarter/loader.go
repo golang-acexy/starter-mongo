@@ -61,9 +61,9 @@ func (m *MongoStarter) Setting() *parent.Setting {
 	return parent.NewSetting(
 		"Mongo-Starter",
 		21,
-		false,
+		true,
 		time.Second*30,
-		func(instance interface{}) {
+		func(instance any) {
 			config := m.getConfig()
 			if config.InitFunc != nil {
 				config.InitFunc(instance.(*mongo.Client))
@@ -71,7 +71,7 @@ func (m *MongoStarter) Setting() *parent.Setting {
 		})
 }
 
-func (m *MongoStarter) Start() (interface{}, error) {
+func (m *MongoStarter) Start() (any, error) {
 	config := m.getConfig()
 	if config.Database != "" {
 		defaultDatabase = config.Database
