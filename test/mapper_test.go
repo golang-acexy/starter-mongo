@@ -48,8 +48,8 @@ func TestSelectById(t *testing.T) {
 	var log1 StartupLog1
 	fmt.Println(mapper.SelectById("684657eb524cbbb7d422a29b", &log, false))
 	fmt.Println(mapper1.SelectById(true, &log1, true))
-	fmt.Println(json.ToJson(log))
-	fmt.Println(json.ToJson(log1))
+	fmt.Println(json.ToString(log))
+	fmt.Println(json.ToString(log1))
 }
 
 func TestSelectByIds(t *testing.T) {
@@ -57,23 +57,23 @@ func TestSelectByIds(t *testing.T) {
 	var logs1 []*StartupLog1
 	fmt.Println(mapper.SelectByIds([]any{"6846578fffc6b1d0c07dd931", "6846578fffc6b1d0c07dd932"}, &logs))
 	fmt.Println(mapper1.SelectByIds([]any{true, false}, &logs1))
-	fmt.Println(json.ToJson(logs))
-	fmt.Println(json.ToJson(logs1))
+	fmt.Println(json.ToString(logs))
+	fmt.Println(json.ToString(logs1))
 }
 
 func TestSelectOne(t *testing.T) {
 	data := StartupLog{Pid: 28}
 	err := mapper.SelectOneByCond(&data, &data)
 	fmt.Println(err)
-	fmt.Println(json.ToJson(data))
+	fmt.Println(json.ToString(data))
 
 	err = mapper.SelectOneByCond(&data, &data, "hostname")
 	fmt.Println(err)
-	fmt.Println(json.ToJson(data))
+	fmt.Println(json.ToString(data))
 
 	err = mapper.SelectOneByBson(bson.M{"pid": 28}, &data)
 	fmt.Println(err)
-	fmt.Println(json.ToJson(data))
+	fmt.Println(json.ToString(data))
 }
 
 func TestSelect(t *testing.T) {
@@ -81,11 +81,11 @@ func TestSelect(t *testing.T) {
 	var dataList []*StartupLog
 	err := mapper.SelectByCond(&data, mongostarter.NewOrderBy("_id", true), &dataList)
 	fmt.Println(err)
-	fmt.Println(json.ToJson(dataList))
+	fmt.Println(json.ToString(dataList))
 
 	err = mapper.SelectByBson(bson.M{"hostname": "998a29f641e6"}, nil, &dataList)
 	fmt.Println(err)
-	fmt.Println(json.ToJson(dataList))
+	fmt.Println(json.ToString(dataList))
 }
 
 func TestCount(t *testing.T) {
@@ -119,10 +119,10 @@ func TestPage(t *testing.T) {
 	var dataList []*StartupLog
 	total, err := mapper.SelectPageByCond(&StartupLog{}, nil, 1, 2, &dataList)
 	fmt.Println(total, err)
-	fmt.Println(json.ToJsonFormat(dataList))
+	fmt.Println(json.ToStringFormat(dataList))
 	total, err = mapper.SelectPageByOption(bson.M{"hostname": "998a29f641e6"}, nil, 2, 2, &dataList)
 	fmt.Println(total, err)
-	fmt.Println(json.ToJsonFormat(dataList))
+	fmt.Println(json.ToStringFormat(dataList))
 }
 
 func TestUpdateById(t *testing.T) {

@@ -45,12 +45,12 @@ func TestLoader(t *testing.T) {
 	var log StartupLog
 	var logs []StartupLog
 	_ = logColl.FindOne(context.Background(), bson.M{}).Decode(&log)
-	fmt.Println(json.ToJsonFormat(log))
+	fmt.Println(json.ToString(log))
 
 	cursor, _ := logColl.Find(context.Background(), bson.M{"_id": bson.M{"$in": []string{"998a29f641e6-1726056851285", "998a29f641e6-1726056854030"}}})
 	_ = cursor.All(context.TODO(), &logs)
-	fmt.Println(json.ToJson(logs))
+	fmt.Println(json.ToString(logs))
 
 	result, _ := loader.StopBySetting()
-	println(json.ToJsonFormat(result))
+	println(json.ToString(result))
 }
