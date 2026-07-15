@@ -124,6 +124,23 @@ func (b BaseMapper[T]) SelectByIDs(ids []any, result *[]*T, notObjectID ...bool)
 	return checkMultipleResult(cursor, err, result)
 }
 
+// ExistsByID 判断指定主键的数据是否存在
+func (b BaseMapper[T]) ExistsByID(id any, notObjectID ...bool) (bool, error) {
+	queryID, err := b.convertID(id, notObjectID...)
+	if err != nil {
+		return false, err
+	}
+	coll, err := b.Collection()
+	if err != nil {
+		return false, err
+	}
+	count, err := coll.CountDocuments(context.Background(), bson.M{"_id": queryID})
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // SelectOneByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
 func (b BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns ...string) error {
@@ -402,6 +419,38 @@ func (b BaseMapper[T]) UpdateByBSON(update, condition bson.M) (int64, error) {
 	return checkUpdateResult(coll.UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
+// UpdateOneWithOptions 使用原生 UpdateOneOptions 更新单条数据
+func (b BaseMapper[T]) UpdateOneWithOptions(filter, update any, opts ...options.Lister[options.UpdateOneOptions]) (int64, error) {
+	empty, err := isEmptyCondition(filter)
+	if err != nil {
+		return 0, err
+	}
+	if empty {
+		return 0, ErrEmptyCondition
+	}
+	coll, err := b.Collection()
+	if err != nil {
+		return 0, err
+	}
+	return checkUpdateResult(coll.UpdateOne(context.Background(), filter, update, opts...))
+}
+
+// UpdateWithOptions 使用原生 UpdateManyOptions 更新多条数据
+func (b BaseMapper[T]) UpdateWithOptions(filter, update any, opts ...options.Lister[options.UpdateManyOptions]) (int64, error) {
+	empty, err := isEmptyCondition(filter)
+	if err != nil {
+		return 0, err
+	}
+	if empty {
+		return 0, ErrEmptyCondition
+	}
+	coll, err := b.Collection()
+	if err != nil {
+		return 0, err
+	}
+	return checkUpdateResult(coll.UpdateMany(context.Background(), filter, update, opts...))
+}
+
 // DeleteByID 根据主键删除数据
 func (b BaseMapper[T]) DeleteByID(id any, notObjectID ...bool) (int64, error) {
 	queryID, err := b.convertID(id, notObjectID...)
@@ -411,6 +460,26 @@ func (b BaseMapper[T]) DeleteByID(id any, notObjectID ...bool) (int64, error) {
 	coll, err := b.Collection()
 	if err != nil { return 0, err }
 	return checkDeleteResult(coll.DeleteOne(context.Background(), bson.M{"_id": queryID}))
+}
+
+// DeleteByIDs 根据多个主键删除数据
+func (b BaseMapper[T]) DeleteByIDs(ids []any, notObjectID ...bool) (int64, error) {
+	if len(ids) == 0 {
+		return 0, ErrEmptyIDs
+	}
+	queryIDs := make([]any, 0, len(ids))
+	for _, id := range ids {
+		queryID, err := b.convertID(id, notObjectID...)
+		if err != nil {
+			return 0, err
+		}
+		queryIDs = append(queryIDs, queryID)
+	}
+	coll, err := b.Collection()
+	if err != nil {
+		return 0, err
+	}
+	return checkDeleteResult(coll.DeleteMany(context.Background(), bson.M{"_id": bson.M{"$in": queryIDs}}))
 }
 
 // DeleteOneByCond 通过条件删除数据
@@ -459,4 +528,36 @@ func (b BaseMapper[T]) DeleteByBSON(condition bson.M) (int64, error) {
 	coll, err := b.Collection()
 	if err != nil { return 0, err }
 	return checkDeleteResult(coll.DeleteMany(context.Background(), condition))
+}
+
+// DeleteOneWithOptions 使用原生 DeleteOneOptions 删除单条数据
+func (b BaseMapper[T]) DeleteOneWithOptions(filter any, opts ...options.Lister[options.DeleteOneOptions]) (int64, error) {
+	empty, err := isEmptyCondition(filter)
+	if err != nil {
+		return 0, err
+	}
+	if empty {
+		return 0, ErrEmptyCondition
+	}
+	coll, err := b.Collection()
+	if err != nil {
+		return 0, err
+	}
+	return checkDeleteResult(coll.DeleteOne(context.Background(), filter, opts...))
+}
+
+// DeleteWithOptions 使用原生 DeleteManyOptions 删除多条数据
+func (b BaseMapper[T]) DeleteWithOptions(filter any, opts ...options.Lister[options.DeleteManyOptions]) (int64, error) {
+	empty, err := isEmptyCondition(filter)
+	if err != nil {
+		return 0, err
+	}
+	if empty {
+		return 0, ErrEmptyCondition
+	}
+	coll, err := b.Collection()
+	if err != nil {
+		return 0, err
+	}
+	return checkDeleteResult(coll.DeleteMany(context.Background(), filter, opts...))
 }

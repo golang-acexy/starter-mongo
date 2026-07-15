@@ -104,6 +104,9 @@ type QueryMapper[T Model] interface {
 	// SelectByIDs 通过多个主键查询数据，默认将字符串 ID 转换为 ObjectID；普通字符串 ID 需要将 notObjectID 设置为 true
 	SelectByIDs(ids []any, result *[]*T, notObjectID ...bool) (err error)
 
+	// ExistsByID 判断指定主键的数据是否存在
+	ExistsByID(id any, notObjectID ...bool) (bool, error)
+
 	// SelectOneByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
 	SelectOneByCond(condition *T, result *T, specifyColumns ...string) error
@@ -185,12 +188,21 @@ type UpdateMapper[T Model] interface {
 
 	// UpdateByBSON 通过 BSON 条件更新多条数据
 	UpdateByBSON(update, condition bson.M) (int64, error)
+
+	// UpdateOneWithOptions 使用原生 UpdateOneOptions 更新单条数据
+	UpdateOneWithOptions(filter, update any, opts ...options.Lister[options.UpdateOneOptions]) (int64, error)
+
+	// UpdateWithOptions 使用原生 UpdateManyOptions 更新多条数据
+	UpdateWithOptions(filter, update any, opts ...options.Lister[options.UpdateManyOptions]) (int64, error)
 }
 
 // DeleteMapper 提供删除能力，返回实际删除的文档数量。
 type DeleteMapper[T Model] interface {
 	// DeleteByID 根据主键删除数据
 	DeleteByID(id any, notObjectID ...bool) (int64, error)
+
+	// DeleteByIDs 根据多个主键删除数据
+	DeleteByIDs(ids []any, notObjectID ...bool) (int64, error)
 
 	// DeleteOneByCond 通过条件删除数据
 	DeleteOneByCond(condition *T) (int64, error)
@@ -203,6 +215,12 @@ type DeleteMapper[T Model] interface {
 
 	// DeleteByBSON 通过 BSON 条件删除多条数据
 	DeleteByBSON(condition bson.M) (int64, error)
+
+	// DeleteOneWithOptions 使用原生 DeleteOneOptions 删除单条数据
+	DeleteOneWithOptions(filter any, opts ...options.Lister[options.DeleteOneOptions]) (int64, error)
+
+	// DeleteWithOptions 使用原生 DeleteManyOptions 删除多条数据
+	DeleteWithOptions(filter any, opts ...options.Lister[options.DeleteManyOptions]) (int64, error)
 }
 
 // Mapper 聚合原始 Collection、查询、插入、更新和删除能力。
