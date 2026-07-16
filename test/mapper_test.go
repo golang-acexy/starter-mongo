@@ -46,11 +46,8 @@ var booleanIDMapper BooleanIDLogMapper
 
 func resetCollection(t *testing.T) {
 	t.Helper()
-	collection, err := mapper.Collection()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = collection.DeleteMany(t.Context(), bson.M{}); err != nil {
+	collection := mapper.Collection()
+	if _, err := collection.DeleteMany(t.Context(), bson.M{}); err != nil {
 		t.Fatal(err)
 	}
 }

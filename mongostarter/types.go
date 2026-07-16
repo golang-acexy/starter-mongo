@@ -93,7 +93,7 @@ func (t *Timestamp) UnmarshalJSON(data []byte) error {
 // RawMapper 提供当前 Mapper 对应的原始 Collection。
 type RawMapper interface {
 	// Collection 获取当前 Mapper 对应的原始 Collection
-	Collection() (*mongo.Collection, error)
+	Collection() *mongo.Collection
 }
 
 // QueryMapper 提供查询、统计和分页能力。
