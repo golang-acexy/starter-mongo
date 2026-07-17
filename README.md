@@ -2,9 +2,15 @@
 
 `starter-mongo` integrates the official MongoDB Go driver with the shared golang-acexy starter lifecycle. It manages one application-wide MongoDB client and provides a generic `BaseMapper` for common query, insert, update, delete, count, and pagination operations.
 
+## Ecosystem Role
+
+Use this starter for direct document persistence and MongoDB-oriented Mapper APIs. `cloud-database/mongo` adds a business-oriented Repository layer while reusing this module's client and mapper lifecycle.
+
 ## Requirements
 
 Current module Go version: `1.25.8`.
+
+## Installation
 
 ```bash
 go get github.com/golang-acexy/starter-mongo
@@ -363,3 +369,4 @@ Important errors include:
 - Shutdown disconnects the client and clears package-owned runtime state.
 - Mapper write methods report acknowledged MongoDB result counts rather than inferring success from the absence of an error.
 - Command logging records command and database names without logging full command payloads.
+- The standard MongoDB starter does not allow parent-managed restart after successful shutdown.

@@ -66,6 +66,7 @@ func (m *MongoStarter) Setting() *parent.Setting {
 	}
 	return parent.NewSetting(
 		"Mongo-Starter",
+		false,
 		21,
 		true,
 		time.Second*30,

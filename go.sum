@@ -1,9 +1,9 @@
-github.com/acexy/golang-toolkit v0.0.65-0.20260708022919-0acbe3b6386d h1:dYqCeCkLywgD/uY5ONDHP4LVqk6eXTw/Qe+ZzbL34Lk=
-github.com/acexy/golang-toolkit v0.0.65-0.20260708022919-0acbe3b6386d/go.mod h1:8r9tzyL1iJAliSxsxNujOcp09Ii4JZl19Fea1ZHkSB4=
+github.com/acexy/golang-toolkit v1.25.0 h1:JBx4/HtJvOhX5mG5HSWCxmQKy6z3Gu6MgIC3JfXtSYY=
+github.com/acexy/golang-toolkit v1.25.0/go.mod h1:pKSyC5IaOl+MZWYvpFIex0nrIrJDqy8c+nmSteV9Xxc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/golang-acexy/starter-parent v0.1.23-0.20260713093351-c249c35849a4 h1:ghOij6U67J96uBbew3eV+z5UZAsIym2ho/0SM4iAJ/g=
-github.com/golang-acexy/starter-parent v0.1.23-0.20260713093351-c249c35849a4/go.mod h1:4KEH7Dvpyzakucw7/S5sW6rJ+/VbDTfGGmh4BeHnpbQ=
+github.com/golang-acexy/starter-parent v1.25.0 h1:vVtyFPTAaZ4Sd0ZjrTRoi6VsDhbtPEgKLiFgeBj0MkU=
+github.com/golang-acexy/starter-parent v1.25.0/go.mod h1:PxrIAjoFb78eOMq4tmvlAbkV+Vra0FDltbKeWld6m50=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/klauspost/compress v1.19.0 h1:sXLILfc9jV2QYWkzFOPWStmcUVH2RHEB1JCdY2oVvCQ=
