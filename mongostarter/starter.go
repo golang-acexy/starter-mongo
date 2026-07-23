@@ -2,8 +2,11 @@ package mongostarter
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/acexy/golang-toolkit/logger"
@@ -14,17 +17,20 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
-var mongoClient *mongo.Client
-var defaultDatabase string
+var (
+	mongoClient     *mongo.Client
+	defaultDatabase string
+	mongoLock       sync.RWMutex
+)
 
 type MongoConfig struct {
 
 	// 工作数据库
 	Database string
 	// Mongo 链接地址串 如果设置了则忽略上面的配置
-	MongoUri string
-	// 设置默认的Bson选项
-	BsonOpts *options.BSONOptions
+	MongoURI string
+	// 设置默认的 BSON 选项
+	BSONOptions *options.BSONOptions
 	// 开启详细日志
 	EnableLogger bool
 	// 网络压缩算法
@@ -60,6 +66,7 @@ func (m *MongoStarter) Setting() *parent.Setting {
 	}
 	return parent.NewSetting(
 		"Mongo-Starter",
+		false,
 		21,
 		true,
 		time.Second*30,
@@ -72,15 +79,22 @@ func (m *MongoStarter) Setting() *parent.Setting {
 }
 
 func (m *MongoStarter) Start() (any, error) {
-	config := m.getConfig()
-	if config.Database != "" {
-		defaultDatabase = config.Database
+	mongoLock.Lock()
+	defer mongoLock.Unlock()
+	if mongoClient != nil {
+		return nil, ErrMongoStarterAlreadyStarted
 	}
-	clientOptions := options.Client().ApplyURI(config.MongoUri)
+
+	config := m.getConfig()
+	if strings.TrimSpace(config.MongoURI) == "" {
+		return nil, ErrMongoURIRequired
+	}
+	database := config.Database
+	clientOptions := options.Client().ApplyURI(config.MongoURI)
 	if config.EnableLogger {
 		monitor := &event.CommandMonitor{
 			Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
-				logger.Logrus().Traceln(evt.CommandName, evt.Command)
+				logger.Logrus().WithField("database", evt.DatabaseName).Traceln(evt.CommandName)
 			},
 		}
 		clientOptions.SetMonitor(monitor)
@@ -90,57 +104,73 @@ func (m *MongoStarter) Start() (any, error) {
 	} else {
 		clientOptions.SetCompressors([]string{"zstd", "zlib", "snappy"})
 	}
-	if config.BsonOpts != nil {
-		clientOptions.SetBSONOptions(config.BsonOpts)
+	if config.BSONOptions != nil {
+		clientOptions.SetBSONOptions(config.BSONOptions)
 	}
-	if defaultDatabase == "" {
+	if database == "" {
 		// 从 URI 的路径部分提取数据库名称（如果有）
 		parsedURI, err := url.Parse(clientOptions.GetURI())
-		if err == nil {
-			// 获取路径部分并去掉前导的 '/'
-			database := strings.TrimPrefix(parsedURI.Path, "/")
-			if database != "" {
-				defaultDatabase = database
-			}
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMongoURI, err)
 		}
+		// 获取路径部分并去掉前导的 '/'
+		uriDatabase := strings.TrimPrefix(parsedURI.Path, "/")
+		if uriDatabase != "" {
+			database = uriDatabase
+		}
+	}
+	if database == "" {
+		return nil, ErrMongoDatabaseRequired
 	}
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
 	}
-	mongoClient = client
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return mongoClient, mongoClient.Ping(ctx, readpref.Primary())
+	if err = client.Ping(ctx, readpref.Primary()); err != nil {
+		_ = client.Disconnect(context.Background())
+		return nil, err
+	}
+	mongoClient = client
+	defaultDatabase = database
+	return mongoClient, nil
 }
 
 func (m *MongoStarter) Stop(maxWaitTime time.Duration) (gracefully, stopped bool, err error) {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	done := make(chan error)
-	go func() {
-		done <- mongoClient.Disconnect(ctx)
-	}()
-	stopped = true
-	select {
-	case <-time.After(maxWaitTime):
-		return
-	case err = <-done:
-		if err == nil {
-			gracefully = true
-		}
+	mongoLock.Lock()
+	defer mongoLock.Unlock()
+	if mongoClient == nil {
+		return false, true, ErrMongoStarterNotStarted
 	}
-	return
+	ctx, cancel := context.WithTimeout(context.Background(), maxWaitTime)
+	defer cancel()
+	if err = mongoClient.Disconnect(ctx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return false, false, ErrMongoStopTimeout
+		}
+		return false, false, err
+	}
+	mongoClient = nil
+	defaultDatabase = ""
+	return true, true, nil
 }
 
 // RawMongoClient 获取原始的 mongo.Client原生能力
 func RawMongoClient() *mongo.Client {
+	mongoLock.RLock()
+	defer mongoLock.RUnlock()
 	return mongoClient
 }
 
 // RawDatabase 获取原始的 mongo.Database 原生能力
 // database 为空则使用默认初始化指定的database
 func RawDatabase(database ...string) *mongo.Database {
+	mongoLock.RLock()
+	defer mongoLock.RUnlock()
+	if mongoClient == nil {
+		return nil
+	}
 	var db string
 	if len(database) > 0 {
 		db = database[0]
@@ -152,5 +182,9 @@ func RawDatabase(database ...string) *mongo.Database {
 
 // RawCollection 获取原始的 mongo.Collection 原生能力
 func RawCollection(collection string, database ...string) *mongo.Collection {
-	return RawDatabase(database...).Collection(collection)
+	db := RawDatabase(database...)
+	if db == nil {
+		return nil
+	}
+	return db.Collection(collection)
 }

@@ -2,10 +2,9 @@ package test
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"testing"
 
-	"github.com/acexy/golang-toolkit/util/json"
 	"github.com/golang-acexy/starter-mongo/mongostarter"
 	"github.com/golang-acexy/starter-parent/parent"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -13,14 +12,15 @@ import (
 )
 
 var loader *parent.StarterLoader
+var startErr error
 
 func init() {
-	loader = parent.NewStarterLoader([]parent.Starter{
+	loader = parent.InitStarterLoader([]parent.Starter{
 		&mongostarter.MongoStarter{
 			Config: mongostarter.MongoConfig{
-				MongoUri: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
+				MongoURI: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
 				//Database: "local",
-				BsonOpts: &options.BSONOptions{
+				BSONOptions: &options.BSONOptions{
 					UseJSONStructTags:   true,
 					ObjectIDAsHexString: true,
 					OmitZeroStruct:      true,
@@ -30,27 +30,33 @@ func init() {
 			},
 		},
 	})
-	err := loader.Start()
-	if err != nil {
-		println(err)
-		return
+	startErr = loader.Start()
+}
+
+func TestMain(m *testing.M) {
+	if startErr != nil {
+		os.Exit(1)
 	}
+	code := m.Run()
+	if collection := mongostarter.RawCollection(testCollection); collection != nil {
+		_, _ = collection.DeleteMany(context.Background(), bson.M{})
+	}
+	_, _ = loader.StopAllBySetting()
+	os.Exit(code)
 }
 
 func TestLoader(t *testing.T) {
-	logColl := mongostarter.RawCollection("startup_log")
-	count, _ := logColl.CountDocuments(context.Background(), bson.D{})
-	fmt.Println(count)
-
-	var log StartupLog
-	var logs []StartupLog
-	_ = logColl.FindOne(context.Background(), bson.M{}).Decode(&log)
-	fmt.Println(json.ToString(log))
-
-	cursor, _ := logColl.Find(context.Background(), bson.M{"_id": bson.M{"$in": []string{"998a29f641e6-1726056851285", "998a29f641e6-1726056854030"}}})
-	_ = cursor.All(context.TODO(), &logs)
-	fmt.Println(json.ToString(logs))
-
-	result, _ := loader.StopBySetting()
-	println(json.ToString(result))
+	if mongostarter.RawMongoClient() == nil {
+		t.Fatal("mongo client is not initialized")
+	}
+	if mongostarter.RawDatabase() == nil {
+		t.Fatal("mongo database is not initialized")
+	}
+	logColl := mongostarter.RawCollection(testCollection)
+	if logColl == nil {
+		t.Fatal("mongo collection is not initialized")
+	}
+	if _, err := logColl.CountDocuments(context.Background(), bson.D{}); err != nil {
+		t.Fatal(err)
+	}
 }
