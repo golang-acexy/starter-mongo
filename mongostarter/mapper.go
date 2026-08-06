@@ -143,7 +143,7 @@ func (b BaseMapper[T]) ExistsByID(id any, notObjectID ...bool) (bool, error) {
 
 // SelectOneByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
-func (b BaseMapper[T]) SelectOneByCond(condition *T, result *T, specifyColumns ...string) error {
+func (b BaseMapper[T]) SelectOneByCond(condition T, result *T, specifyColumns ...string) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil { return err }
 	return checkSingleResult(coll.FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
@@ -166,7 +166,7 @@ func (b BaseMapper[T]) SelectOneWithOptions(filter any, result *T, opts ...optio
 
 // SelectByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
-func (b BaseMapper[T]) SelectByCond(condition *T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
+func (b BaseMapper[T]) SelectByCond(condition T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
 	opt := specifyColumnsOpt(specifyColumns...)
 	if len(orderBy) > 0 {
 		setOrderBy(&opt, orderBy)
@@ -199,7 +199,7 @@ func (b BaseMapper[T]) SelectWithOptions(filter any, result *[]*T, opts ...optio
 }
 
 // CountByCond 通过条件查询数据总数
-func (b BaseMapper[T]) CountByCond(condition *T) (int64, error) {
+func (b BaseMapper[T]) CountByCond(condition T) (int64, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil { return 0, err }
 	return coll.CountDocuments(context.Background(), condition)
@@ -220,7 +220,7 @@ func (b BaseMapper[T]) CountWithOptions(filter any, opts ...options.Lister[optio
 }
 
 // SelectPageByCond 通过实体条件分页查询
-func (b BaseMapper[T]) SelectPageByCond(condition *T, query PageQuery, result *[]*T) (total int64, err error) {
+func (b BaseMapper[T]) SelectPageByCond(condition T, query PageQuery, result *[]*T) (total int64, err error) {
 	if query.PageNumber <= 0 || query.PageSize <= 0 {
 		return 0, ErrInvalidPage
 	}
@@ -372,7 +372,7 @@ func (b BaseMapper[T]) UpdateByIDWithBSON(update bson.M, id any, notObjectID ...
 }
 
 // UpdateOneByCond 通过条件更新单条数据
-func (b BaseMapper[T]) UpdateOneByCond(update, condition *T) (int64, error) {
+func (b BaseMapper[T]) UpdateOneByCond(update *T, condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
 		return 0, err
@@ -396,7 +396,7 @@ func (b BaseMapper[T]) UpdateOneByBSON(update, condition bson.M) (int64, error) 
 }
 
 // UpdateByCond 通过条件更新多条数据
-func (b BaseMapper[T]) UpdateByCond(update, condition *T) (int64, error) {
+func (b BaseMapper[T]) UpdateByCond(update *T, condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
 		return 0, err
@@ -483,7 +483,7 @@ func (b BaseMapper[T]) DeleteByIDs(ids []any, notObjectID ...bool) (int64, error
 }
 
 // DeleteOneByCond 通过条件删除数据
-func (b BaseMapper[T]) DeleteOneByCond(condition *T) (int64, error) {
+func (b BaseMapper[T]) DeleteOneByCond(condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
 		return 0, err
@@ -507,7 +507,7 @@ func (b BaseMapper[T]) DeleteOneByBSON(condition bson.M) (int64, error) {
 }
 
 // DeleteByCond 通过条件删除数据
-func (b BaseMapper[T]) DeleteByCond(condition *T) (int64, error) {
+func (b BaseMapper[T]) DeleteByCond(condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
 		return 0, err

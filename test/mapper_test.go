@@ -255,7 +255,7 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 	}
 
 	var one StartupLog
-	if err := mapper.SelectOneByCond(&StartupLog{Hostname: "node-a"}, &one); err != nil {
+	if err := mapper.SelectOneByCond(StartupLog{Hostname: "node-a"}, &one); err != nil {
 		t.Fatal(err)
 	}
 	if one.Hostname != "node-a" {
@@ -301,7 +301,7 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 	}
 
 	total, err = mapper.SelectPageByCond(
-		&StartupLog{Hostname: "node-a"},
+		StartupLog{Hostname: "node-a"},
 		mongostarter.PageQuery{PageNumber: 1, PageSize: 1, OrderBy: mongostarter.NewOrderBy("pid", true)},
 		&logs,
 	)
@@ -337,7 +337,7 @@ func TestListAndCountVariants(t *testing.T) {
 	insertLog(t, "count-b", 3)
 
 	var logs []*StartupLog
-	if err := mapper.SelectByCond(&StartupLog{Hostname: "count-a"}, mongostarter.NewOrderBy("pid", true), &logs); err != nil {
+	if err := mapper.SelectByCond(StartupLog{Hostname: "count-a"}, mongostarter.NewOrderBy("pid", true), &logs); err != nil {
 		t.Fatal(err)
 	}
 	if len(logs) != 2 || logs[0].PID != 2 {
@@ -356,7 +356,7 @@ func TestListAndCountVariants(t *testing.T) {
 		t.Fatalf("unexpected options list: %+v", logs)
 	}
 
-	count, err := mapper.CountByCond(&StartupLog{Hostname: "count-a"})
+	count, err := mapper.CountByCond(StartupLog{Hostname: "count-a"})
 	if err != nil || count != 2 {
 		t.Fatalf("unexpected condition count: count=%d err=%v", count, err)
 	}
@@ -376,7 +376,7 @@ func TestUpdateAndDeleteByCondition(t *testing.T) {
 	insertLog(t, "target", 2)
 	insertLog(t, "other", 3)
 
-	modified, err := mapper.UpdateOneByCond(&StartupLog{PID: 10}, &StartupLog{Hostname: "target"})
+	modified, err := mapper.UpdateOneByCond(&StartupLog{PID: 10}, StartupLog{Hostname: "target"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestUpdateAndDeleteByCondition(t *testing.T) {
 	if deleted != 1 {
 		t.Fatalf("expected 1 deleted document, got %d", deleted)
 	}
-	deleted, err = mapper.DeleteByCond(&StartupLog{Hostname: "target"})
+	deleted, err = mapper.DeleteByCond(StartupLog{Hostname: "target"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,12 +422,12 @@ func TestRemainingUpdateAndDeleteVariants(t *testing.T) {
 	if err != nil || modified != 1 {
 		t.Fatalf("unexpected BSON single update: modified=%d err=%v", modified, err)
 	}
-	modified, err = mapper.UpdateByCond(&StartupLog{PID: 30}, &StartupLog{Hostname: "variant-many"})
+	modified, err = mapper.UpdateByCond(&StartupLog{PID: 30}, StartupLog{Hostname: "variant-many"})
 	if err != nil || modified != 2 {
 		t.Fatalf("unexpected condition update: modified=%d err=%v", modified, err)
 	}
 
-	deleted, err := mapper.DeleteOneByCond(&StartupLog{Hostname: "variant-one"})
+	deleted, err := mapper.DeleteOneByCond(StartupLog{Hostname: "variant-one"})
 	if err != nil || deleted != 1 {
 		t.Fatalf("unexpected condition single delete: deleted=%d err=%v", deleted, err)
 	}
@@ -507,7 +507,7 @@ func TestValidationErrors(t *testing.T) {
 	if _, err := mapper.DeleteByIDs(nil); !errors.Is(err, mongostarter.ErrEmptyIDs) {
 		t.Fatalf("expected ErrEmptyIDs, got %v", err)
 	}
-	if _, err := mapper.SelectPageByCond(&StartupLog{}, mongostarter.PageQuery{}, &logs); !errors.Is(err, mongostarter.ErrInvalidPage) {
+	if _, err := mapper.SelectPageByCond(StartupLog{}, mongostarter.PageQuery{}, &logs); !errors.Is(err, mongostarter.ErrInvalidPage) {
 		t.Fatalf("expected ErrInvalidPage, got %v", err)
 	}
 	if _, err := mapper.UpdateByBSON(bson.M{"pid": 1}, bson.M{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
@@ -516,10 +516,10 @@ func TestValidationErrors(t *testing.T) {
 	if _, err := mapper.DeleteByBSON(bson.M{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
 		t.Fatalf("expected ErrEmptyCondition, got %v", err)
 	}
-	if _, err := mapper.UpdateOneByCond(&StartupLog{PID: 1}, &StartupLog{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
+	if _, err := mapper.UpdateOneByCond(&StartupLog{PID: 1}, StartupLog{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
 		t.Fatalf("expected ErrEmptyCondition, got %v", err)
 	}
-	if _, err := mapper.DeleteOneByCond(&StartupLog{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
+	if _, err := mapper.DeleteOneByCond(StartupLog{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
 		t.Fatalf("expected ErrEmptyCondition, got %v", err)
 	}
 	if _, err := mapper.UpdateOneWithOptions(bson.M{}, bson.M{"$set": bson.M{"pid": 1}}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
