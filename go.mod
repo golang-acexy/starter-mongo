@@ -3,13 +3,13 @@ module github.com/golang-acexy/starter-mongo
 go 1.25.8
 
 require (
-	github.com/acexy/golang-toolkit v1.25.0
+	github.com/acexy/golang-toolkit v1.25.2
 	github.com/golang-acexy/starter-parent v1.25.0
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 )
 
 require (
-	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
