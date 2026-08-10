@@ -154,7 +154,7 @@ Mapper queries are available in three forms:
 Typed condition query:
 
 ```go
-condition := &User{Status: "active"}
+condition := User{Status: "active"}
 var users []*User
 
 err := mapper.SelectByCond(
@@ -192,6 +192,8 @@ err := mapper.SelectWithOptions(
 ```
 
 Use `SelectOneByCond`, `SelectOneByBSON`, or `SelectOneWithOptions` when one document is expected. Use `CountByCond`, `CountByBSON`, or `CountWithOptions` for counts.
+
+Typed conditions use value semantics. Pass `T` as the condition, `*T` as a single-result destination, and `*[]*T` as a multiple-result destination.
 
 The `specifyColumns` arguments build an inclusion projection. MongoDB's `_id` field is excluded unless `_id` is explicitly requested.
 
@@ -248,6 +250,15 @@ modified, err = mapper.UpdateByBSON(
 ```
 
 Typed alternatives are `UpdateByID`, `UpdateOneByCond`, and `UpdateByCond`. Use `UpdateByIDWithBSON` when the update requires MongoDB operators.
+
+For typed updates, the update document remains a pointer and the condition is a value:
+
+```go
+modified, err := mapper.UpdateByCond(
+	&User{Status: "disabled"},
+	User{Status: "inactive"},
+)
+```
 
 All condition-based update methods reject empty conditions with `ErrEmptyCondition`. This prevents an accidental update of an entire collection.
 

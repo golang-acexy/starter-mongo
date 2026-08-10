@@ -109,7 +109,7 @@ type QueryMapper[T Model] interface {
 
 	// SelectOneByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
-	SelectOneByCond(condition *T, result *T, specifyColumns ...string) error
+	SelectOneByCond(condition T, result *T, specifyColumns ...string) error
 
 	// SelectOneByBSON 通过 BSON 条件查询一条数据
 	// specifyColumns 需要指定只查询的数据库字段
@@ -120,7 +120,7 @@ type QueryMapper[T Model] interface {
 
 	// SelectByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
-	SelectByCond(condition *T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error
+	SelectByCond(condition T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error
 
 	// SelectByBSON 通过 BSON 条件查询数据
 	// specifyColumns 需要指定只查询的数据库字段
@@ -130,7 +130,7 @@ type QueryMapper[T Model] interface {
 	SelectWithOptions(filter any, result *[]*T, opts ...options.Lister[options.FindOptions]) error
 
 	// CountByCond 通过条件查询数据总数
-	CountByCond(condition *T) (int64, error)
+	CountByCond(condition T) (int64, error)
 
 	// CountByBSON 通过 BSON 条件统计数据总数
 	CountByBSON(condition bson.M) (int64, error)
@@ -139,7 +139,7 @@ type QueryMapper[T Model] interface {
 	CountWithOptions(filter any, opts ...options.Lister[options.CountOptions]) (int64, error)
 
 	// SelectPageByCond 通过实体条件分页查询
-	SelectPageByCond(condition *T, query PageQuery, result *[]*T) (total int64, err error)
+	SelectPageByCond(condition T, query PageQuery, result *[]*T) (total int64, err error)
 
 	// SelectPageByBSON 通过 BSON 条件分页查询
 	SelectPageByBSON(condition bson.M, query PageQuery, result *[]*T) (total int64, err error)
@@ -178,13 +178,13 @@ type UpdateMapper[T Model] interface {
 	UpdateByIDWithBSON(update bson.M, id any, notObjectID ...bool) (int64, error)
 
 	// UpdateOneByCond 通过条件更新单条数据
-	UpdateOneByCond(update, condition *T) (int64, error)
+	UpdateOneByCond(update *T, condition T) (int64, error)
 
 	// UpdateOneByBSON 通过 BSON 条件更新一条数据
 	UpdateOneByBSON(update, condition bson.M) (int64, error)
 
 	// UpdateByCond 通过条件更新多条数据
-	UpdateByCond(update, condition *T) (int64, error)
+	UpdateByCond(update *T, condition T) (int64, error)
 
 	// UpdateByBSON 通过 BSON 条件更新多条数据
 	UpdateByBSON(update, condition bson.M) (int64, error)
@@ -205,13 +205,13 @@ type DeleteMapper[T Model] interface {
 	DeleteByIDs(ids []any, notObjectID ...bool) (int64, error)
 
 	// DeleteOneByCond 通过条件删除数据
-	DeleteOneByCond(condition *T) (int64, error)
+	DeleteOneByCond(condition T) (int64, error)
 
 	// DeleteOneByBSON 通过 BSON 条件删除一条数据
 	DeleteOneByBSON(condition bson.M) (int64, error)
 
 	// DeleteByCond 通过条件删除数据
-	DeleteByCond(condition *T) (int64, error)
+	DeleteByCond(condition T) (int64, error)
 
 	// DeleteByBSON 通过 BSON 条件删除多条数据
 	DeleteByBSON(condition bson.M) (int64, error)
