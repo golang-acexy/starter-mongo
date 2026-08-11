@@ -27,19 +27,21 @@ type OrderBy struct {
 	Desc bool
 }
 
-// QueryOptions 定义通用查询的排序和投影选项。
+// QueryOptions 定义普通列表查询的排序、投影和数量限制。
 type QueryOptions struct {
 	OrderBy       []*OrderBy
 	SelectColumns []string
+	Limit         int
 }
 
 // PageOptions 定义分页以及原生查询选项。
 type PageOptions struct {
-	PageNumber int
-	PageSize   int
-	QueryOptions
-	FindOptions  []options.Lister[options.FindOptions]
-	CountOptions []options.Lister[options.CountOptions]
+	Number        int
+	Size          int
+	OrderBy       []*OrderBy
+	SelectColumns []string
+	FindOptions   []options.Lister[options.FindOptions]
+	CountOptions  []options.Lister[options.CountOptions]
 }
 
 // PageQuery 定义包含实体条件的分页查询。
@@ -168,11 +170,11 @@ type QueryMapper[T Model] interface {
 	// SelectWithOptions 使用原生 FindOptions 查询数据
 	SelectWithOptions(filter any, result *[]*T, opts ...options.Lister[options.FindOptions]) error
 
-	// CountByCond 通过条件查询数据总数
-	CountByCond(condition T) (int64, error)
+	// CountByCond 通过实体条件统计数据。
+	CountByCond(query CondQuery[T]) (int64, error)
 
-	// CountByBSON 通过 BSON 条件统计数据总数
-	CountByBSON(condition bson.M) (int64, error)
+	// CountByBSON 通过 BSON 条件统计数据。
+	CountByBSON(query BSONQuery) (int64, error)
 
 	// CountWithOptions 使用原生 CountOptions 统计数据总数
 	CountWithOptions(filter any, opts ...options.Lister[options.CountOptions]) (int64, error)

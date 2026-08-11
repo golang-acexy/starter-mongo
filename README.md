@@ -105,13 +105,10 @@ mapper := UserMapper{}
 var users []*User
 
 err := mapper.SelectByCond(
-	mongostarter.CondQuery[User]{
-		Condition: User{Status: "active"},
-		QueryOptions: mongostarter.QueryOptions{
-			OrderBy:       mongostarter.NewOrderBy("createdAt", true),
-			SelectColumns: []string{"name", "status"},
-		},
-	},
+	mongostarter.NewCondQuery(User{Status: "active"}).
+		WithOrderBy(mongostarter.OrderBy{Column: "createdAt", Desc: true}).
+		Select("name", "status").
+		WithLimit(20),
 	&users,
 )
 ```
@@ -120,15 +117,11 @@ Complex BSON and native options remain available:
 
 ```go
 err := mapper.SelectByBSON(
-	mongostarter.BSONQuery{
-		Condition: bson.M{"status": "active", "age": bson.M{"$gte": 18}},
-		QueryOptions: mongostarter.QueryOptions{
-			OrderBy: mongostarter.NewOrderBys(
-				mongostarter.OrderBy{Column: "status"},
-				mongostarter.OrderBy{Column: "createdAt", Desc: true},
-			),
-		},
-	},
+	mongostarter.NewBSONQuery(bson.M{"status": "active", "age": bson.M{"$gte": 18}}).
+		WithOrderBy(
+			mongostarter.OrderBy{Column: "status"},
+			mongostarter.OrderBy{Column: "createdAt", Desc: true},
+		),
 	&users,
 )
 
@@ -141,7 +134,17 @@ err = mapper.SelectWithOptions(
 
 Use `SelectOne...` for one document and `Count...` for counts. Typed conditions use value semantics: `T` is the condition, `*T` is a single-result destination, and `*[]*T` is a list destination.
 
+Count operations use the same condition query structures as document queries:
+
+```go
+total, err := mapper.CountByBSON(
+	mongostarter.BSONQuery{Condition: bson.M{"status": "active"}},
+)
+```
+
 `SelectColumns` creates an inclusion projection. MongoDB's `_id` is excluded unless explicitly selected.
+
+`QueryOptions.Limit` applies only to list queries. Zero leaves the result unrestricted; negative values return `ErrInvalidQueryRange`. Pagination uses only `PageOptions.Number/Size`.
 
 ## ID Handling
 
@@ -206,22 +209,14 @@ Delete APIs return MongoDB's deleted document count. Condition-based updates and
 Page numbers start at `1`; page number and page size must both be positive.
 
 ```go
-query := mongostarter.BSONPageQuery{
-	Condition: bson.M{"status": "active"},
-	PageOptions: mongostarter.PageOptions{
-		PageNumber: 2,
-		PageSize:   20,
-		QueryOptions: mongostarter.QueryOptions{
-			OrderBy: mongostarter.NewOrderBys(
-				mongostarter.OrderBy{Column: "createdAt", Desc: true},
-				mongostarter.OrderBy{Column: "name"},
-			),
-			SelectColumns: []string{"name", "status", "createdAt"},
-		},
-		FindOptions:  []options.Lister[options.FindOptions]{options.Find().SetAllowDiskUse(true)},
-		CountOptions: []options.Lister[options.CountOptions]{options.Count().SetHint("status_1")},
-	},
-}
+query := mongostarter.NewBSONPageQuery(bson.M{"status": "active"}, 2, 20).
+	WithOrderBy(
+			mongostarter.OrderBy{Column: "createdAt", Desc: true},
+			mongostarter.OrderBy{Column: "name"},
+		).
+	Select("name", "status", "createdAt").
+	WithFindOptions(options.Find().SetAllowDiskUse(true)).
+	WithCountOptions(options.Count().SetHint("status_1"))
 
 var users []*User
 total, err := mapper.SelectPageByBSON(query, &users)
