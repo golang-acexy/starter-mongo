@@ -62,12 +62,36 @@ func setOrderBy(opt **options.FindOptionsBuilder, orderBy []*OrderBy) {
 	}
 }
 
-func setPage(opt **options.FindOptionsBuilder, pageNumber, pageSize int) {
+func setOneOrderBy(opt **options.FindOneOptionsBuilder, orderBy []*OrderBy) {
+	if *opt == nil {
+		*opt = options.FindOne()
+	}
+	if len(orderBy) > 0 {
+		sort := make(bson.D, 0, len(orderBy))
+		for _, order := range orderBy {
+			value := 1
+			if order.Desc {
+				value = -1
+			}
+			sort = append(sort, bson.E{Key: order.Column, Value: value})
+		}
+		(*opt).SetSort(sort)
+	}
+}
+
+func setPage(opt **options.FindOptionsBuilder, number, size int) {
 	if *opt == nil {
 		*opt = options.Find()
 	}
-	skip := (pageNumber - 1) * pageSize
-	(*opt).SetSkip(int64(skip)).SetLimit(int64(pageSize))
+	skip := (number - 1) * size
+	(*opt).SetSkip(int64(skip)).SetLimit(int64(size))
+}
+
+func setLimit(opt **options.FindOptionsBuilder, limit int) {
+	if *opt == nil {
+		*opt = options.Find()
+	}
+	(*opt).SetLimit(int64(limit))
 }
 
 func isEmptyCondition(condition any) (bool, error) {
@@ -147,22 +171,26 @@ func (b BaseMapper[T]) ExistsByID(id any, notObjectID ...bool) (bool, error) {
 
 // SelectOneByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
-func (b BaseMapper[T]) SelectOneByCond(condition T, result *T, specifyColumns ...string) error {
+func (b BaseMapper[T]) SelectOneByCond(query CondQuery[T], result *T) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return err
 	}
-	return checkSingleResult(coll.FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
+	opt := specifyColumnsOneOpt(query.SelectColumns...)
+	setOneOrderBy(&opt, query.OrderBy)
+	return checkSingleResult(coll.FindOne(context.Background(), query.Condition, opt), result)
 }
 
 // SelectOneByBSON 通过 BSON 条件查询一条数据
 // specifyColumns 需要指定只查询的数据库字段
-func (b BaseMapper[T]) SelectOneByBSON(condition bson.M, result *T, specifyColumns ...string) error {
+func (b BaseMapper[T]) SelectOneByBSON(query BSONQuery, result *T) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return err
 	}
-	return checkSingleResult(coll.FindOne(context.Background(), condition, specifyColumnsOneOpt(specifyColumns...)), result)
+	opt := specifyColumnsOneOpt(query.SelectColumns...)
+	setOneOrderBy(&opt, query.OrderBy)
+	return checkSingleResult(coll.FindOne(context.Background(), query.Condition, opt), result)
 }
 
 // SelectOneWithOptions 使用原生 FindOneOptions 查询一条数据
@@ -176,31 +204,43 @@ func (b BaseMapper[T]) SelectOneWithOptions(filter any, result *T, opts ...optio
 
 // SelectByCond 通过条件查询
 // specifyColumns 需要指定只查询的数据库字段
-func (b BaseMapper[T]) SelectByCond(condition T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
-	opt := specifyColumnsOpt(specifyColumns...)
-	if len(orderBy) > 0 {
-		setOrderBy(&opt, orderBy)
+func (b BaseMapper[T]) SelectByCond(query CondQuery[T], result *[]*T) error {
+	if query.Limit < 0 {
+		return ErrInvalidQueryRange
+	}
+	opt := specifyColumnsOpt(query.SelectColumns...)
+	if len(query.OrderBy) > 0 {
+		setOrderBy(&opt, query.OrderBy)
+	}
+	if query.Limit > 0 {
+		setLimit(&opt, query.Limit)
 	}
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return err
 	}
-	cursor, err := coll.Find(context.Background(), condition, opt)
+	cursor, err := coll.Find(context.Background(), query.Condition, opt)
 	return checkMultipleResult(cursor, err, result)
 }
 
 // SelectByBSON 通过 BSON 条件查询数据
 // specifyColumns 需要指定只查询的数据库字段
-func (b BaseMapper[T]) SelectByBSON(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error {
-	opt := specifyColumnsOpt(specifyColumns...)
-	if len(orderBy) > 0 {
-		setOrderBy(&opt, orderBy)
+func (b BaseMapper[T]) SelectByBSON(query BSONQuery, result *[]*T) error {
+	if query.Limit < 0 {
+		return ErrInvalidQueryRange
+	}
+	opt := specifyColumnsOpt(query.SelectColumns...)
+	if len(query.OrderBy) > 0 {
+		setOrderBy(&opt, query.OrderBy)
+	}
+	if query.Limit > 0 {
+		setLimit(&opt, query.Limit)
 	}
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return err
 	}
-	cursor, err := coll.Find(context.Background(), condition, opt)
+	cursor, err := coll.Find(context.Background(), query.Condition, opt)
 	return checkMultipleResult(cursor, err, result)
 }
 
@@ -214,22 +254,22 @@ func (b BaseMapper[T]) SelectWithOptions(filter any, result *[]*T, opts ...optio
 	return checkMultipleResult(cursor, err, result)
 }
 
-// CountByCond 通过条件查询数据总数
-func (b BaseMapper[T]) CountByCond(condition T) (int64, error) {
+// CountByCond 通过实体条件统计数据。
+func (b BaseMapper[T]) CountByCond(query CondQuery[T]) (int64, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
 	}
-	return coll.CountDocuments(context.Background(), condition)
+	return coll.CountDocuments(context.Background(), query.Condition)
 }
 
-// CountByBSON 通过 BSON 条件统计数据总数
-func (b BaseMapper[T]) CountByBSON(condition bson.M) (int64, error) {
+// CountByBSON 通过 BSON 条件统计数据。
+func (b BaseMapper[T]) CountByBSON(query BSONQuery) (int64, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
 	}
-	return coll.CountDocuments(context.Background(), condition)
+	return coll.CountDocuments(context.Background(), query.Condition)
 }
 
 // CountWithOptions 使用原生 CountOptions 统计数据总数
@@ -242,59 +282,64 @@ func (b BaseMapper[T]) CountWithOptions(filter any, opts ...options.Lister[optio
 }
 
 // SelectPageByCond 通过实体条件分页查询
-func (b BaseMapper[T]) SelectPageByCond(condition T, query PageQuery, result *[]*T) (total int64, err error) {
-	if query.PageNumber <= 0 || query.PageSize <= 0 {
+func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total int64, err error) {
+	if query.Number <= 0 || query.Size <= 0 {
 		return 0, ErrInvalidPage
 	}
-	total, err = b.CountByCond(condition)
+	total, err = b.CountWithOptions(query.Condition, query.CountOptions...)
 	if err != nil {
 		return 0, err
 	}
-	opt := specifyColumnsOpt(query.SpecifyColumns...)
+	opt := specifyColumnsOpt(query.SelectColumns...)
 	if len(query.OrderBy) > 0 {
 		setOrderBy(&opt, query.OrderBy)
 	}
-	setPage(&opt, query.PageNumber, query.PageSize)
+	setPage(&opt, query.Number, query.Size)
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
 	}
-	cursor, err := coll.Find(context.Background(), condition, opt)
+	query.FindOptions = append(query.FindOptions, opt)
+	cursor, err := coll.Find(context.Background(), query.Condition, query.FindOptions...)
 	return total, checkMultipleResult(cursor, err, result)
 }
 
 // SelectPageByBSON 通过 BSON 条件分页查询
-func (b BaseMapper[T]) SelectPageByBSON(condition bson.M, query PageQuery, result *[]*T) (total int64, err error) {
-	if query.PageNumber <= 0 || query.PageSize <= 0 {
+func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (total int64, err error) {
+	if query.Number <= 0 || query.Size <= 0 {
 		return 0, ErrInvalidPage
 	}
-	total, err = b.CountByBSON(condition)
+	total, err = b.CountWithOptions(query.Condition, query.CountOptions...)
 	if err != nil {
 		return 0, err
 	}
-	opt := specifyColumnsOpt(query.SpecifyColumns...)
+	opt := specifyColumnsOpt(query.SelectColumns...)
 	if len(query.OrderBy) > 0 {
 		setOrderBy(&opt, query.OrderBy)
 	}
-	setPage(&opt, query.PageNumber, query.PageSize)
+	setPage(&opt, query.Number, query.Size)
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
 	}
-	cursor, err := coll.Find(context.Background(), condition, opt)
+	query.FindOptions = append(query.FindOptions, opt)
+	cursor, err := coll.Find(context.Background(), query.Condition, query.FindOptions...)
 	return total, checkMultipleResult(cursor, err, result)
 }
 
 // SelectPageWithOptions 使用原生查询选项分页查询
-func (b BaseMapper[T]) SelectPageWithOptions(filter any, query PageQuery, result *[]*T) (total int64, err error) {
-	if query.PageNumber <= 0 || query.PageSize <= 0 {
+func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T) (total int64, err error) {
+	if query.Number <= 0 || query.Size <= 0 {
 		return 0, ErrInvalidPage
 	}
-	total, err = b.CountWithOptions(filter, query.CountOptions...)
+	total, err = b.CountWithOptions(query.Filter, query.CountOptions...)
 	if err != nil {
 		return 0, err
 	}
 
+	if len(query.SelectColumns) > 0 {
+		query.FindOptions = append(query.FindOptions, specifyColumnsOpt(query.SelectColumns...))
+	}
 	if len(query.OrderBy) > 0 {
 		sort := make(bson.D, 0, len(query.OrderBy))
 		for _, order := range query.OrderBy {
@@ -306,13 +351,13 @@ func (b BaseMapper[T]) SelectPageWithOptions(filter any, query PageQuery, result
 		}
 		query.FindOptions = append(query.FindOptions, options.Find().SetSort(sort))
 	}
-	skip := (query.PageNumber - 1) * query.PageSize
-	query.FindOptions = append(query.FindOptions, options.Find().SetSkip(int64(skip)).SetLimit(int64(query.PageSize)))
+	skip := (query.Number - 1) * query.Size
+	query.FindOptions = append(query.FindOptions, options.Find().SetSkip(int64(skip)).SetLimit(int64(query.Size)))
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
 	}
-	cursor, err := coll.Find(context.Background(), filter, query.FindOptions...)
+	cursor, err := coll.Find(context.Background(), query.Filter, query.FindOptions...)
 	return total, checkMultipleResult(cursor, err, result)
 }
 

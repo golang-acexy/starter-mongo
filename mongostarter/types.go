@@ -27,14 +27,51 @@ type OrderBy struct {
 	Desc bool
 }
 
-// PageQuery 定义分页、排序、投影以及原生查询选项。
-type PageQuery struct {
-	PageNumber     int
-	PageSize       int
-	OrderBy        []*OrderBy
-	SpecifyColumns []string
-	FindOptions    []options.Lister[options.FindOptions]
-	CountOptions   []options.Lister[options.CountOptions]
+// QueryOptions 定义普通列表查询的排序、投影和数量限制。
+type QueryOptions struct {
+	OrderBy       []*OrderBy
+	SelectColumns []string
+	Limit         int
+}
+
+// PageOptions 定义分页以及原生查询选项。
+type PageOptions struct {
+	Number        int
+	Size          int
+	OrderBy       []*OrderBy
+	SelectColumns []string
+	FindOptions   []options.Lister[options.FindOptions]
+	CountOptions  []options.Lister[options.CountOptions]
+}
+
+// PageQuery 定义包含实体条件的分页查询。
+type PageQuery[T Model] struct {
+	Condition T
+	PageOptions
+}
+
+// BSONPageQuery 定义包含 BSON 条件的分页查询。
+type BSONPageQuery struct {
+	Condition bson.M
+	PageOptions
+}
+
+// FilterPageQuery 定义包含原生 Filter 的分页查询。
+type FilterPageQuery struct {
+	Filter any
+	PageOptions
+}
+
+// CondQuery 定义实体条件查询。
+type CondQuery[T Model] struct {
+	Condition T
+	QueryOptions
+}
+
+// BSONQuery 定义 BSON 条件查询。
+type BSONQuery struct {
+	Condition bson.M
+	QueryOptions
 }
 
 // NewOrderBy 新增排序规则
@@ -53,6 +90,10 @@ func NewOrderBys(orderBy ...OrderBy) []*OrderBy {
 
 // Timestamp 将 MongoDB ISODate 与时间戳 JSON 相互转换。
 type Timestamp json.Timestamp
+
+func NewTimestamp(time time.Time) Timestamp {
+	return Timestamp{Time: time}
+}
 
 func (t Timestamp) MarshalBSONValue() (typ byte, data []byte, err error) {
 	if t.IsZero() {
@@ -109,43 +150,43 @@ type QueryMapper[T Model] interface {
 
 	// SelectOneByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
-	SelectOneByCond(condition T, result *T, specifyColumns ...string) error
+	SelectOneByCond(query CondQuery[T], result *T) error
 
 	// SelectOneByBSON 通过 BSON 条件查询一条数据
 	// specifyColumns 需要指定只查询的数据库字段
-	SelectOneByBSON(condition bson.M, result *T, specifyColumns ...string) error
+	SelectOneByBSON(query BSONQuery, result *T) error
 
 	// SelectOneWithOptions 使用原生 FindOneOptions 查询一条数据
 	SelectOneWithOptions(filter any, result *T, opts ...options.Lister[options.FindOneOptions]) error
 
 	// SelectByCond 通过条件查询
 	// specifyColumns 需要指定只查询的数据库字段
-	SelectByCond(condition T, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error
+	SelectByCond(query CondQuery[T], result *[]*T) error
 
 	// SelectByBSON 通过 BSON 条件查询数据
 	// specifyColumns 需要指定只查询的数据库字段
-	SelectByBSON(condition bson.M, orderBy []*OrderBy, result *[]*T, specifyColumns ...string) error
+	SelectByBSON(query BSONQuery, result *[]*T) error
 
 	// SelectWithOptions 使用原生 FindOptions 查询数据
 	SelectWithOptions(filter any, result *[]*T, opts ...options.Lister[options.FindOptions]) error
 
-	// CountByCond 通过条件查询数据总数
-	CountByCond(condition T) (int64, error)
+	// CountByCond 通过实体条件统计数据。
+	CountByCond(query CondQuery[T]) (int64, error)
 
-	// CountByBSON 通过 BSON 条件统计数据总数
-	CountByBSON(condition bson.M) (int64, error)
+	// CountByBSON 通过 BSON 条件统计数据。
+	CountByBSON(query BSONQuery) (int64, error)
 
 	// CountWithOptions 使用原生 CountOptions 统计数据总数
 	CountWithOptions(filter any, opts ...options.Lister[options.CountOptions]) (int64, error)
 
 	// SelectPageByCond 通过实体条件分页查询
-	SelectPageByCond(condition T, query PageQuery, result *[]*T) (total int64, err error)
+	SelectPageByCond(query PageQuery[T], result *[]*T) (total int64, err error)
 
 	// SelectPageByBSON 通过 BSON 条件分页查询
-	SelectPageByBSON(condition bson.M, query PageQuery, result *[]*T) (total int64, err error)
+	SelectPageByBSON(query BSONPageQuery, result *[]*T) (total int64, err error)
 
 	// SelectPageWithOptions 使用原生查询选项分页查询
-	SelectPageWithOptions(filter any, query PageQuery, result *[]*T) (total int64, err error)
+	SelectPageWithOptions(query FilterPageQuery, result *[]*T) (total int64, err error)
 }
 
 // InsertMapper 提供插入能力。

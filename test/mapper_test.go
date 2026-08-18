@@ -255,14 +255,14 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 	}
 
 	var one StartupLog
-	if err := mapper.SelectOneByCond(StartupLog{Hostname: "node-a"}, &one); err != nil {
+	if err := mapper.SelectOneByCond(mongostarter.CondQuery[StartupLog]{Condition: StartupLog{Hostname: "node-a"}}, &one); err != nil {
 		t.Fatal(err)
 	}
 	if one.Hostname != "node-a" {
 		t.Fatalf("unexpected condition result: %+v", one)
 	}
 	one = StartupLog{}
-	if err := mapper.SelectOneByBSON(bson.M{"hostname": "node-b"}, &one, "hostname"); err != nil {
+	if err := mapper.SelectOneByBSON(mongostarter.BSONQuery{Condition: bson.M{"hostname": "node-b"}, QueryOptions: mongostarter.QueryOptions{SelectColumns: []string{"hostname"}}}, &one); err != nil {
 		t.Fatal(err)
 	}
 	if one.Hostname != "node-b" || one.ID != "" {
@@ -281,7 +281,7 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 		mongostarter.OrderBy{Column: "hostname"},
 		mongostarter.OrderBy{Column: "pid", Desc: true},
 	)
-	if err := mapper.SelectByBSON(bson.M{}, orders, &logs); err != nil {
+	if err := mapper.SelectByBSON(mongostarter.BSONQuery{Condition: bson.M{}, QueryOptions: mongostarter.QueryOptions{OrderBy: orders}}, &logs); err != nil {
 		t.Fatal(err)
 	}
 	if len(logs) != 5 || logs[0].Hostname != "node-a" || logs[0].PID != 2 {
@@ -289,8 +289,13 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 	}
 
 	total, err := mapper.SelectPageByBSON(
-		bson.M{},
-		mongostarter.PageQuery{PageNumber: 2, PageSize: 2, OrderBy: mongostarter.NewOrderBy("pid", false)},
+		mongostarter.BSONPageQuery{Condition: bson.M{}, PageOptions: mongostarter.PageOptions{
+			Number:       2,
+			Size:         2,
+			OrderBy:      mongostarter.NewOrderBy("pid", false),
+			FindOptions:  []options.Lister[options.FindOptions]{options.Find().SetProjection(bson.M{"pid": 1})},
+			CountOptions: []options.Lister[options.CountOptions]{options.Count().SetComment("bson-page")},
+		}},
 		&logs,
 	)
 	if err != nil {
@@ -301,8 +306,16 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 	}
 
 	total, err = mapper.SelectPageByCond(
-		StartupLog{Hostname: "node-a"},
-		mongostarter.PageQuery{PageNumber: 1, PageSize: 1, OrderBy: mongostarter.NewOrderBy("pid", true)},
+		mongostarter.PageQuery[StartupLog]{
+			Condition: StartupLog{Hostname: "node-a"},
+			PageOptions: mongostarter.PageOptions{
+				Number:       1,
+				Size:         1,
+				OrderBy:      mongostarter.NewOrderBy("pid", true),
+				FindOptions:  []options.Lister[options.FindOptions]{options.Find().SetProjection(bson.M{"pid": 1})},
+				CountOptions: []options.Lister[options.CountOptions]{options.Count().SetComment("condition-page")},
+			},
+		},
 		&logs,
 	)
 	if err != nil {
@@ -313,13 +326,12 @@ func TestQueryVariantsAndPagination(t *testing.T) {
 	}
 
 	total, err = mapper.SelectPageWithOptions(
-		bson.M{"hostname": "node-b"},
-		mongostarter.PageQuery{
-			PageNumber:   1,
-			PageSize:     1,
+		mongostarter.FilterPageQuery{Filter: bson.M{"hostname": "node-b"}, PageOptions: mongostarter.PageOptions{
+			Number:       1,
+			Size:         1,
 			FindOptions:  []options.Lister[options.FindOptions]{options.Find().SetProjection(bson.M{"hostname": 1})},
 			CountOptions: []options.Lister[options.CountOptions]{options.Count().SetComment("integration-test")},
-		},
+		}},
 		&logs,
 	)
 	if err != nil {
@@ -337,11 +349,16 @@ func TestListAndCountVariants(t *testing.T) {
 	insertLog(t, "count-b", 3)
 
 	var logs []*StartupLog
-	if err := mapper.SelectByCond(StartupLog{Hostname: "count-a"}, mongostarter.NewOrderBy("pid", true), &logs); err != nil {
+	if err := mapper.SelectByCond(mongostarter.CondQuery[StartupLog]{Condition: StartupLog{Hostname: "count-a"}, QueryOptions: mongostarter.QueryOptions{OrderBy: mongostarter.NewOrderBy("pid", true), Limit: 1}}, &logs); err != nil {
 		t.Fatal(err)
 	}
-	if len(logs) != 2 || logs[0].PID != 2 {
+	if len(logs) != 1 || logs[0].PID != 2 {
 		t.Fatalf("unexpected condition list: %+v", logs)
+	}
+
+	logs = nil
+	if err := mapper.SelectByBSON(mongostarter.BSONQuery{Condition: bson.M{"hostname": "count-a"}, QueryOptions: mongostarter.QueryOptions{Limit: 1}}, &logs); err != nil || len(logs) != 1 {
+		t.Fatalf("unexpected BSON limit result: logs=%+v err=%v", logs, err)
 	}
 
 	logs = nil
@@ -356,11 +373,11 @@ func TestListAndCountVariants(t *testing.T) {
 		t.Fatalf("unexpected options list: %+v", logs)
 	}
 
-	count, err := mapper.CountByCond(StartupLog{Hostname: "count-a"})
+	count, err := mapper.CountByCond(mongostarter.CondQuery[StartupLog]{Condition: StartupLog{Hostname: "count-a"}})
 	if err != nil || count != 2 {
 		t.Fatalf("unexpected condition count: count=%d err=%v", count, err)
 	}
-	count, err = mapper.CountByBSON(bson.M{"hostname": "count-b"})
+	count, err = mapper.CountByBSON(mongostarter.BSONQuery{Condition: bson.M{"hostname": "count-b"}})
 	if err != nil || count != 1 {
 		t.Fatalf("unexpected BSON count: count=%d err=%v", count, err)
 	}
@@ -475,7 +492,7 @@ func TestUpdateAndDeleteWithOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	var upserted StartupLog
-	if err = mapper.SelectOneByBSON(bson.M{"hostname": "options-upsert"}, &upserted); err != nil {
+	if err = mapper.SelectOneByBSON(mongostarter.BSONQuery{Condition: bson.M{"hostname": "options-upsert"}}, &upserted); err != nil {
 		t.Fatal(err)
 	}
 	if upserted.PID != 30 {
@@ -507,8 +524,11 @@ func TestValidationErrors(t *testing.T) {
 	if _, err := mapper.DeleteByIDs(nil); !errors.Is(err, mongostarter.ErrEmptyIDs) {
 		t.Fatalf("expected ErrEmptyIDs, got %v", err)
 	}
-	if _, err := mapper.SelectPageByCond(StartupLog{}, mongostarter.PageQuery{}, &logs); !errors.Is(err, mongostarter.ErrInvalidPage) {
+	if _, err := mapper.SelectPageByCond(mongostarter.PageQuery[StartupLog]{}, &logs); !errors.Is(err, mongostarter.ErrInvalidPage) {
 		t.Fatalf("expected ErrInvalidPage, got %v", err)
+	}
+	if err := mapper.SelectByCond(mongostarter.CondQuery[StartupLog]{QueryOptions: mongostarter.QueryOptions{Limit: -1}}, &logs); !errors.Is(err, mongostarter.ErrInvalidQueryRange) {
+		t.Fatalf("expected ErrInvalidQueryRange, got %v", err)
 	}
 	if _, err := mapper.UpdateByBSON(bson.M{"pid": 1}, bson.M{}); !errors.Is(err, mongostarter.ErrEmptyCondition) {
 		t.Fatalf("expected ErrEmptyCondition, got %v", err)
