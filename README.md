@@ -17,7 +17,7 @@
 
 ## Requirements
 
-- Go `1.25.8`
+- Go `1.26.7`
 
 ## Installation
 
@@ -194,6 +194,8 @@ modified, err = mapper.UpdateOneByBSON(
 
 Use BSON updates when MongoDB operators such as `$set`, `$inc`, or array operators are required. Update APIs return MongoDB's modified document count.
 
+BSON update methods accept both plain field documents and native update operators. Plain fields are wrapped in `$set`; documents whose top-level keys use MongoDB operators are passed through unchanged.
+
 ## Delete
 
 ```go
@@ -246,6 +248,7 @@ Raw accessors return `nil` before startup. `mapper.Collection()` follows the sam
 - Empty update or delete conditions return `ErrEmptyCondition`.
 - Empty ID batches return `ErrEmptyIDs`.
 - Invalid pagination returns `ErrInvalidPage`.
+- Empty or nil sorting rules return `ErrInvalidOrderBy`.
 - Unacknowledged writes return `ErrNotAcknowledged`.
 - Missing or invalid connection settings return `ErrMongoURIRequired`, `ErrMongoDatabaseRequired`, or `ErrInvalidMongoURI`.
 - Using the Mapper outside the active lifecycle returns `ErrMongoStarterNotStarted`.
@@ -258,6 +261,20 @@ Exported package errors support `errors.Is`.
 - The package owns one process-wide client and one default database.
 - Multiple active `MongoStarter` instances are not supported.
 - Configuration is resolved once and retained for the starter lifecycle.
+
+## Testing
+
+Default tests are deterministic package-level unit tests and do not require MongoDB:
+
+```bash
+go test ./...
+```
+
+The tests under `test/` use a real MongoDB deployment and are guarded by the `integration` build tag. Set `MONGO_TEST_URI` before running them explicitly:
+
+```bash
+MONGO_TEST_URI='mongodb://YOUR_USERNAME:YOUR_PASSWORD@127.0.0.1:27017/app' go test -tags=integration ./test
+```
 - Shutdown disconnects the client and clears package-owned runtime state.
 - Command logging records command and database names without full payloads.
 - A successfully stopped MongoDB starter is not restartable through the parent lifecycle.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/acexy/golang-toolkit/util/coll"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
@@ -48,17 +49,13 @@ func checkMultipleInsertResult(result *mongo.InsertManyResult, err error) ([]str
 	if !result.Acknowledged {
 		return nil, ErrNotAcknowledged
 	}
-	objectIDs := result.InsertedIDs
-	var ids []string
-	for _, v := range objectIDs {
+	return coll.SliceCollect(result.InsertedIDs, func(v any) string {
 		objectID, ok := v.(bson.ObjectID)
 		if ok {
-			ids = append(ids, objectID.Hex())
-		} else {
-			ids = append(ids, fmt.Sprintf("%v", v))
+			return objectID.Hex()
 		}
-	}
-	return ids, nil
+		return fmt.Sprintf("%v", v)
+	}), nil
 }
 
 // checkUpdateResult 检查更新结果

@@ -2,7 +2,9 @@ package mongostarter
 
 import (
 	"context"
+	"math"
 	"reflect"
+	"strings"
 
 	"github.com/acexy/golang-toolkit/util/coll"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -20,10 +22,9 @@ func collection(name string) (*mongo.Collection, error) {
 
 func specifyColumnsOneOpt(specifyColumns ...string) *options.FindOneOptionsBuilder {
 	if len(specifyColumns) > 0 {
-		column := make(map[string]int, len(specifyColumns))
-		for _, v := range specifyColumns {
-			column[v] = 1
-		}
+		column := coll.SliceFilterToMap(specifyColumns, func(column string) (string, int, bool) {
+			return column, 1, true
+		})
 		if !coll.SliceContains(specifyColumns, "_id") {
 			column["_id"] = 0
 		}
@@ -34,10 +35,9 @@ func specifyColumnsOneOpt(specifyColumns ...string) *options.FindOneOptionsBuild
 
 func specifyColumnsOpt(specifyColumns ...string) *options.FindOptionsBuilder {
 	if len(specifyColumns) > 0 {
-		column := make(map[string]int, len(specifyColumns))
-		for _, v := range specifyColumns {
-			column[v] = 1
-		}
+		column := coll.SliceFilterToMap(specifyColumns, func(column string) (string, int, bool) {
+			return column, 1, true
+		})
 		if !coll.SliceContains(specifyColumns, "_id") {
 			column["_id"] = 0
 		}
@@ -45,46 +45,75 @@ func specifyColumnsOpt(specifyColumns ...string) *options.FindOptionsBuilder {
 	}
 	return nil
 }
-func setOrderBy(opt **options.FindOptionsBuilder, orderBy []*OrderBy) {
+func buildSort(orderBy []*OrderBy) (bson.D, error) {
+	sort := make(bson.D, 0, len(orderBy))
+	for _, order := range orderBy {
+		if order == nil || strings.TrimSpace(order.Column) == "" {
+			return nil, ErrInvalidOrderBy
+		}
+		value := 1
+		if order.Desc {
+			value = -1
+		}
+		sort = append(sort, bson.E{Key: order.Column, Value: value})
+	}
+	return sort, nil
+}
+
+func validateOrderBy(orderBy []*OrderBy) error {
+	_, err := buildSort(orderBy)
+	return err
+}
+
+func setOrderBy(opt **options.FindOptionsBuilder, orderBy []*OrderBy) error {
 	if *opt == nil {
 		*opt = options.Find()
 	}
 	if len(orderBy) > 0 {
-		sort := make(bson.D, 0, len(orderBy))
-		for _, order := range orderBy {
-			value := 1
-			if order.Desc {
-				value = -1
-			}
-			sort = append(sort, bson.E{Key: order.Column, Value: value})
+		sort, err := buildSort(orderBy)
+		if err != nil {
+			return err
 		}
 		(*opt).SetSort(sort)
 	}
+	return nil
 }
 
-func setOneOrderBy(opt **options.FindOneOptionsBuilder, orderBy []*OrderBy) {
+func setOneOrderBy(opt **options.FindOneOptionsBuilder, orderBy []*OrderBy) error {
 	if *opt == nil {
 		*opt = options.FindOne()
 	}
 	if len(orderBy) > 0 {
-		sort := make(bson.D, 0, len(orderBy))
-		for _, order := range orderBy {
-			value := 1
-			if order.Desc {
-				value = -1
-			}
-			sort = append(sort, bson.E{Key: order.Column, Value: value})
+		sort, err := buildSort(orderBy)
+		if err != nil {
+			return err
 		}
 		(*opt).SetSort(sort)
 	}
+	return nil
 }
 
-func setPage(opt **options.FindOptionsBuilder, number, size int) {
+func pageOffset(number, size int) (int64, error) {
+	if number <= 0 || size <= 0 {
+		return 0, ErrInvalidPage
+	}
+	number64, size64 := int64(number), int64(size)
+	if number64-1 > math.MaxInt64/size64 {
+		return 0, ErrInvalidPage
+	}
+	return (number64 - 1) * size64, nil
+}
+
+func setPage(opt **options.FindOptionsBuilder, number, size int) error {
+	skip, err := pageOffset(number, size)
+	if err != nil {
+		return err
+	}
 	if *opt == nil {
 		*opt = options.Find()
 	}
-	skip := (number - 1) * size
-	(*opt).SetSkip(int64(skip)).SetLimit(int64(size))
+	(*opt).SetSkip(skip).SetLimit(int64(size))
+	return nil
 }
 
 func setLimit(opt **options.FindOptionsBuilder, limit int) {
@@ -111,6 +140,15 @@ func isEmptyCondition(condition any) (bool, error) {
 		return false, err
 	}
 	return len(document) == 0, nil
+}
+
+func normalizeBSONUpdate(update bson.M) bson.M {
+	for key := range update {
+		if strings.HasPrefix(key, "$") {
+			return update
+		}
+	}
+	return bson.M{"$set": update}
 }
 
 // Collection 获取当前 Mapper 对应的原始 Collection。
@@ -177,7 +215,9 @@ func (b BaseMapper[T]) SelectOneByCond(query CondQuery[T], result *T) error {
 		return err
 	}
 	opt := specifyColumnsOneOpt(query.SelectColumns...)
-	setOneOrderBy(&opt, query.OrderBy)
+	if err = setOneOrderBy(&opt, query.OrderBy); err != nil {
+		return err
+	}
 	return checkSingleResult(coll.FindOne(context.Background(), query.Condition, opt), result)
 }
 
@@ -189,7 +229,9 @@ func (b BaseMapper[T]) SelectOneByBSON(query BSONQuery, result *T) error {
 		return err
 	}
 	opt := specifyColumnsOneOpt(query.SelectColumns...)
-	setOneOrderBy(&opt, query.OrderBy)
+	if err = setOneOrderBy(&opt, query.OrderBy); err != nil {
+		return err
+	}
 	return checkSingleResult(coll.FindOne(context.Background(), query.Condition, opt), result)
 }
 
@@ -210,7 +252,9 @@ func (b BaseMapper[T]) SelectByCond(query CondQuery[T], result *[]*T) error {
 	}
 	opt := specifyColumnsOpt(query.SelectColumns...)
 	if len(query.OrderBy) > 0 {
-		setOrderBy(&opt, query.OrderBy)
+		if err := setOrderBy(&opt, query.OrderBy); err != nil {
+			return err
+		}
 	}
 	if query.Limit > 0 {
 		setLimit(&opt, query.Limit)
@@ -231,7 +275,9 @@ func (b BaseMapper[T]) SelectByBSON(query BSONQuery, result *[]*T) error {
 	}
 	opt := specifyColumnsOpt(query.SelectColumns...)
 	if len(query.OrderBy) > 0 {
-		setOrderBy(&opt, query.OrderBy)
+		if err := setOrderBy(&opt, query.OrderBy); err != nil {
+			return err
+		}
 	}
 	if query.Limit > 0 {
 		setLimit(&opt, query.Limit)
@@ -283,8 +329,11 @@ func (b BaseMapper[T]) CountWithOptions(filter any, opts ...options.Lister[optio
 
 // SelectPageByCond 通过实体条件分页查询
 func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total int64, err error) {
-	if query.Number <= 0 || query.Size <= 0 {
-		return 0, ErrInvalidPage
+	if _, err = pageOffset(query.Number, query.Size); err != nil {
+		return 0, err
+	}
+	if err = validateOrderBy(query.OrderBy); err != nil {
+		return 0, err
 	}
 	total, err = b.CountWithOptions(query.Condition, query.CountOptions...)
 	if err != nil {
@@ -292,9 +341,13 @@ func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total
 	}
 	opt := specifyColumnsOpt(query.SelectColumns...)
 	if len(query.OrderBy) > 0 {
-		setOrderBy(&opt, query.OrderBy)
+		if err = setOrderBy(&opt, query.OrderBy); err != nil {
+			return 0, err
+		}
 	}
-	setPage(&opt, query.Number, query.Size)
+	if err = setPage(&opt, query.Number, query.Size); err != nil {
+		return 0, err
+	}
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
@@ -306,8 +359,11 @@ func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total
 
 // SelectPageByBSON 通过 BSON 条件分页查询
 func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (total int64, err error) {
-	if query.Number <= 0 || query.Size <= 0 {
-		return 0, ErrInvalidPage
+	if _, err = pageOffset(query.Number, query.Size); err != nil {
+		return 0, err
+	}
+	if err = validateOrderBy(query.OrderBy); err != nil {
+		return 0, err
 	}
 	total, err = b.CountWithOptions(query.Condition, query.CountOptions...)
 	if err != nil {
@@ -315,9 +371,13 @@ func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (tota
 	}
 	opt := specifyColumnsOpt(query.SelectColumns...)
 	if len(query.OrderBy) > 0 {
-		setOrderBy(&opt, query.OrderBy)
+		if err = setOrderBy(&opt, query.OrderBy); err != nil {
+			return 0, err
+		}
 	}
-	setPage(&opt, query.Number, query.Size)
+	if err = setPage(&opt, query.Number, query.Size); err != nil {
+		return 0, err
+	}
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
@@ -329,8 +389,11 @@ func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (tota
 
 // SelectPageWithOptions 使用原生查询选项分页查询
 func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T) (total int64, err error) {
-	if query.Number <= 0 || query.Size <= 0 {
-		return 0, ErrInvalidPage
+	if _, err = pageOffset(query.Number, query.Size); err != nil {
+		return 0, err
+	}
+	if err = validateOrderBy(query.OrderBy); err != nil {
+		return 0, err
 	}
 	total, err = b.CountWithOptions(query.Filter, query.CountOptions...)
 	if err != nil {
@@ -341,18 +404,17 @@ func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T
 		query.FindOptions = append(query.FindOptions, specifyColumnsOpt(query.SelectColumns...))
 	}
 	if len(query.OrderBy) > 0 {
-		sort := make(bson.D, 0, len(query.OrderBy))
-		for _, order := range query.OrderBy {
-			value := 1
-			if order.Desc {
-				value = -1
-			}
-			sort = append(sort, bson.E{Key: order.Column, Value: value})
+		sort, sortErr := buildSort(query.OrderBy)
+		if sortErr != nil {
+			return 0, sortErr
 		}
 		query.FindOptions = append(query.FindOptions, options.Find().SetSort(sort))
 	}
-	skip := (query.Number - 1) * query.Size
-	query.FindOptions = append(query.FindOptions, options.Find().SetSkip(int64(skip)).SetLimit(int64(query.Size)))
+	skip, pageErr := pageOffset(query.Number, query.Size)
+	if pageErr != nil {
+		return 0, pageErr
+	}
+	query.FindOptions = append(query.FindOptions, options.Find().SetSkip(skip).SetLimit(int64(query.Size)))
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
 		return 0, err
@@ -457,7 +519,7 @@ func (b BaseMapper[T]) UpdateByIDWithBSON(update bson.M, id any, notObjectID ...
 	if err != nil {
 		return 0, err
 	}
-	return checkUpdateResult(coll.UpdateByID(context.Background(), queryID, bson.M{"$set": update}))
+	return checkUpdateResult(coll.UpdateByID(context.Background(), queryID, normalizeBSONUpdate(update)))
 }
 
 // UpdateOneByCond 通过条件更新单条数据
@@ -485,7 +547,7 @@ func (b BaseMapper[T]) UpdateOneByBSON(update, condition bson.M) (int64, error) 
 	if err != nil {
 		return 0, err
 	}
-	return checkUpdateResult(coll.UpdateOne(context.Background(), condition, bson.M{"$set": update}))
+	return checkUpdateResult(coll.UpdateOne(context.Background(), condition, normalizeBSONUpdate(update)))
 }
 
 // UpdateByCond 通过条件更新多条数据
@@ -513,7 +575,7 @@ func (b BaseMapper[T]) UpdateByBSON(update, condition bson.M) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return checkUpdateResult(coll.UpdateMany(context.Background(), condition, bson.M{"$set": update}))
+	return checkUpdateResult(coll.UpdateMany(context.Background(), condition, normalizeBSONUpdate(update)))
 }
 
 // UpdateOneWithOptions 使用原生 UpdateOneOptions 更新单条数据

@@ -1,6 +1,6 @@
 module github.com/golang-acexy/starter-mongo
 
-go 1.25.8
+go 1.26.7
 
 require (
 	github.com/acexy/golang-toolkit v1.25.4
