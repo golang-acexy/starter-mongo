@@ -3,6 +3,7 @@ package mongostarter
 import (
 	"time"
 
+	"github.com/acexy/golang-toolkit/util/coll"
 	"github.com/acexy/golang-toolkit/util/json"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -81,11 +82,10 @@ func NewOrderBy(column string, desc bool) []*OrderBy {
 
 // NewOrderBys 按传入顺序创建多个排序规则
 func NewOrderBys(orderBy ...OrderBy) []*OrderBy {
-	result := make([]*OrderBy, 0, len(orderBy))
-	for i := range orderBy {
-		result = append(result, &orderBy[i])
-	}
-	return result
+	return coll.SliceCollect(orderBy, func(order OrderBy) *OrderBy {
+		result := order
+		return &result
+	})
 }
 
 // Timestamp 将 MongoDB ISODate 与时间戳 JSON 相互转换。

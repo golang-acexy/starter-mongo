@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/acexy/golang-toolkit/logger"
@@ -18,9 +20,23 @@ import (
 )
 
 var (
-	mongoClient     *mongo.Client
-	defaultDatabase string
-	mongoLock       sync.RWMutex
+	mongoRuntimeState atomic.Pointer[mongoRuntime]
+	mongoLock         sync.Mutex
+	mongoState        lifecycleState
+)
+
+type mongoRuntime struct {
+	client   *mongo.Client
+	database string
+}
+
+type lifecycleState uint8
+
+const (
+	lifecycleStopped lifecycleState = iota
+	lifecycleStarting
+	lifecycleRunning
+	lifecycleStopping
 )
 
 type MongoConfig struct {
@@ -44,19 +60,25 @@ type MongoStarter struct {
 	LazyConfig func() MongoConfig
 
 	config       *MongoConfig
+	configOnce   sync.Once
 	MongoSetting *parent.Setting
 }
 
 func (m *MongoStarter) getConfig() *MongoConfig {
-	if m.config == nil {
+	m.configOnce.Do(func() {
 		var config MongoConfig
 		if m.LazyConfig != nil {
 			config = m.LazyConfig()
 		} else {
 			config = m.Config
 		}
+		config.Compressors = slices.Clone(config.Compressors)
+		if config.BSONOptions != nil {
+			bsonOptions := *config.BSONOptions
+			config.BSONOptions = &bsonOptions
+		}
 		m.config = &config
-	}
+	})
 	return m.config
 }
 
@@ -80,10 +102,21 @@ func (m *MongoStarter) Setting() *parent.Setting {
 
 func (m *MongoStarter) Start() (any, error) {
 	mongoLock.Lock()
-	defer mongoLock.Unlock()
-	if mongoClient != nil {
+	if mongoState != lifecycleStopped {
+		mongoLock.Unlock()
 		return nil, ErrMongoStarterAlreadyStarted
 	}
+	mongoState = lifecycleStarting
+	mongoLock.Unlock()
+
+	started := false
+	defer func() {
+		if !started {
+			mongoLock.Lock()
+			mongoState = lifecycleStopped
+			mongoLock.Unlock()
+		}
+	}()
 
 	config := m.getConfig()
 	if strings.TrimSpace(config.MongoURI) == "" {
@@ -132,52 +165,65 @@ func (m *MongoStarter) Start() (any, error) {
 		_ = client.Disconnect(context.Background())
 		return nil, err
 	}
-	mongoClient = client
-	defaultDatabase = database
-	return mongoClient, nil
+	mongoLock.Lock()
+	mongoRuntimeState.Store(&mongoRuntime{client: client, database: database})
+	mongoState = lifecycleRunning
+	mongoLock.Unlock()
+	started = true
+	return client, nil
 }
 
 func (m *MongoStarter) Stop(maxWaitTime time.Duration) (gracefully, stopped bool, err error) {
 	mongoLock.Lock()
-	defer mongoLock.Unlock()
-	if mongoClient == nil {
+	runtime := mongoRuntimeState.Load()
+	if mongoState != lifecycleRunning || runtime == nil {
+		mongoLock.Unlock()
 		return false, true, ErrMongoStarterNotStarted
 	}
+	client := runtime.client
+	mongoRuntimeState.Store(nil)
+	mongoState = lifecycleStopping
+	mongoLock.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), maxWaitTime)
 	defer cancel()
-	if err = mongoClient.Disconnect(ctx); err != nil {
+	err = client.Disconnect(ctx)
+
+	mongoLock.Lock()
+	mongoState = lifecycleStopped
+	mongoLock.Unlock()
+	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return false, false, ErrMongoStopTimeout
+			return false, true, ErrMongoStopTimeout
 		}
-		return false, false, err
+		return false, true, err
 	}
-	mongoClient = nil
-	defaultDatabase = ""
 	return true, true, nil
 }
 
 // RawMongoClient 获取原始的 mongo.Client原生能力
 func RawMongoClient() *mongo.Client {
-	mongoLock.RLock()
-	defer mongoLock.RUnlock()
-	return mongoClient
+	runtime := mongoRuntimeState.Load()
+	if runtime == nil {
+		return nil
+	}
+	return runtime.client
 }
 
 // RawDatabase 获取原始的 mongo.Database 原生能力
 // database 为空则使用默认初始化指定的database
 func RawDatabase(database ...string) *mongo.Database {
-	mongoLock.RLock()
-	defer mongoLock.RUnlock()
-	if mongoClient == nil {
+	runtime := mongoRuntimeState.Load()
+	if runtime == nil {
 		return nil
 	}
 	var db string
 	if len(database) > 0 {
 		db = database[0]
 	} else {
-		db = defaultDatabase
+		db = runtime.database
 	}
-	return mongoClient.Database(db)
+	return runtime.client.Database(db)
 }
 
 // RawCollection 获取原始的 mongo.Collection 原生能力

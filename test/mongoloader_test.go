@@ -1,3 +1,5 @@
+//go:build integration
+
 package test
 
 import (
@@ -12,13 +14,16 @@ import (
 )
 
 var loader *parent.StarterLoader
-var startErr error
 
-func init() {
+func TestMain(m *testing.M) {
+	mongoURI := os.Getenv("MONGO_TEST_URI")
+	if mongoURI == "" {
+		os.Exit(0)
+	}
 	loader = parent.InitStarterLoader([]parent.Starter{
 		&mongostarter.MongoStarter{
 			Config: mongostarter.MongoConfig{
-				MongoURI: "mongodb://acexy:tech-acexy@localhost:27017/local?authSource=admin",
+				MongoURI: mongoURI,
 				//Database: "local",
 				BSONOptions: &options.BSONOptions{
 					UseJSONStructTags:   true,
@@ -30,11 +35,7 @@ func init() {
 			},
 		},
 	})
-	startErr = loader.Start()
-}
-
-func TestMain(m *testing.M) {
-	if startErr != nil {
+	if err := loader.Start(); err != nil {
 		os.Exit(1)
 	}
 	code := m.Run()

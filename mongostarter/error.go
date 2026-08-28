@@ -10,6 +10,7 @@ var (
 	ErrEmptyCondition             = errors.New("condition must not be empty")
 	ErrInvalidPage                = errors.New("page number and page size must be greater than zero")
 	ErrInvalidQueryRange          = errors.New("query limit must not be negative")
+	ErrInvalidOrderBy             = errors.New("order by column must not be empty")
 	ErrNotAcknowledged            = errors.New("mongo operation was not acknowledged")
 	ErrMongoURIRequired           = errors.New("mongo URI is required")
 	ErrMongoDatabaseRequired      = errors.New("mongo database is required")
