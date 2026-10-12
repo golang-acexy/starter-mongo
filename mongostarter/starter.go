@@ -39,28 +39,34 @@ const (
 	lifecycleStopping
 )
 
+// MongoConfig configures the singleton client; connection pool and driver timeouts are configured through MongoURI.
 type MongoConfig struct {
 
-	// 工作数据库
+	// Database selects the default database; nonempty values override the URI path.
 	Database string
-	// Mongo 链接地址串 如果设置了则忽略上面的配置
+	// MongoURI is required and configures driver options, including pool sizes and timeouts.
 	MongoURI string
-	// 设置默认的 BSON 选项
+	// BSONOptions configures driver encoding/decoding; empty-filter guards use default encoding instead.
 	BSONOptions *options.BSONOptions
-	// 开启详细日志
+	// EnableLogger logs command and database names at trace level without command payloads.
 	EnableLogger bool
-	// 网络压缩算法
+	// Compressors overrides URI compression; nil selects zstd/zlib/snappy and an empty slice disables compression.
 	Compressors []string
 
+	// InitFunc is invoked by the default parent hook after startup; it cannot change connection initialization options.
 	InitFunc func(instance *mongo.Client)
 }
 
+// MongoStarter owns the shared client lifecycle; configure fields before startup and keep them fixed while running.
 type MongoStarter struct {
+	// Config supplies static configuration when LazyConfig is nil.
 	Config     MongoConfig
+	// LazyConfig takes precedence and is evaluated once on first resolution during startup or the init hook.
 	LazyConfig func() MongoConfig
 
 	config       *MongoConfig
 	configOnce   sync.Once
+	// MongoSetting overrides the default parent setting, including the InitFunc hook.
 	MongoSetting *parent.Setting
 }
 
@@ -82,6 +88,7 @@ func (m *MongoStarter) getConfig() *MongoConfig {
 	return m.config
 }
 
+// Setting returns a custom setting or the default non-restartable parent setting with a post-start InitFunc hook.
 func (m *MongoStarter) Setting() *parent.Setting {
 	if m.MongoSetting != nil {
 		return m.MongoSetting
@@ -100,6 +107,8 @@ func (m *MongoStarter) Setting() *parent.Setting {
 		})
 }
 
+// Start connects and verifies primary availability with a fixed five-second Ping deadline.
+// It publishes the client only on success; overlapping lifecycle transitions return ErrMongoStarterAlreadyStarted.
 func (m *MongoStarter) Start() (any, error) {
 	mongoLock.Lock()
 	if mongoState != lifecycleStopped {
@@ -141,12 +150,12 @@ func (m *MongoStarter) Start() (any, error) {
 		clientOptions.SetBSONOptions(config.BSONOptions)
 	}
 	if database == "" {
-		// 从 URI 的路径部分提取数据库名称（如果有）
+		// Resolve the URI database only when the explicit database is absent.
 		parsedURI, err := url.Parse(clientOptions.GetURI())
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidMongoURI, err)
 		}
-		// 获取路径部分并去掉前导的 '/'
+		// Remove the leading slash from the URI database path.
 		uriDatabase := strings.TrimPrefix(parsedURI.Path, "/")
 		if uriDatabase != "" {
 			database = uriDatabase
@@ -173,6 +182,9 @@ func (m *MongoStarter) Start() (any, error) {
 	return client, nil
 }
 
+// Stop withdraws shared handles before disconnecting within maxWaitTime; callbacks receive no cancellation signal.
+// Timeout returns false, true, ErrMongoStopTimeout. Other errors also leave the runtime withdrawn.
+// Nonpositive waits create an expired deadline; raw handles must not be used to bypass shutdown.
 func (m *MongoStarter) Stop(maxWaitTime time.Duration) (gracefully, stopped bool, err error) {
 	mongoLock.Lock()
 	runtime := mongoRuntimeState.Load()
@@ -201,7 +213,7 @@ func (m *MongoStarter) Stop(maxWaitTime time.Duration) (gracefully, stopped bool
 	return true, true, nil
 }
 
-// RawMongoClient 获取原始的 mongo.Client原生能力
+// RawMongoClient returns the borrowed shared client, or nil outside the active lifecycle; callers must not disconnect it.
 func RawMongoClient() *mongo.Client {
 	runtime := mongoRuntimeState.Load()
 	if runtime == nil {
@@ -210,8 +222,8 @@ func RawMongoClient() *mongo.Client {
 	return runtime.client
 }
 
-// RawDatabase 获取原始的 mongo.Database 原生能力
-// database 为空则使用默认初始化指定的database
+// RawDatabase returns a borrowed database handle, or nil outside the active lifecycle.
+// With no argument it uses the startup database; otherwise only the first argument is used, even when empty.
 func RawDatabase(database ...string) *mongo.Database {
 	runtime := mongoRuntimeState.Load()
 	if runtime == nil {
@@ -226,7 +238,8 @@ func RawDatabase(database ...string) *mongo.Database {
 	return runtime.client.Database(db)
 }
 
-// RawCollection 获取原始的 mongo.Collection 原生能力
+// RawCollection returns a borrowed collection handle, or nil outside the active lifecycle.
+// The optional database follows RawDatabase semantics; callers own custom context/session operations.
 func RawCollection(collection string, database ...string) *mongo.Collection {
 	db := RawDatabase(database...)
 	if db == nil {

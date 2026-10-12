@@ -151,12 +151,13 @@ func normalizeBSONUpdate(update bson.M) bson.M {
 	return bson.M{"$set": update}
 }
 
-// Collection 获取当前 Mapper 对应的原始 Collection。
+// Collection returns the borrowed model collection, or nil outside the active lifecycle.
 func (b BaseMapper[T]) Collection() *mongo.Collection {
 	return RawCollection(b.model.CollectionName())
 }
 
-// SelectByID 通过主键查询数据，默认将字符串 ID 转换为 ObjectID；普通字符串 ID 需要将 notObjectID 设置为 true
+// SelectByID decodes one document into a nonnil destination; absence returns mongo.ErrNoDocuments.
+// Strings become ObjectIDs unless the first notObjectID value is true; extra values are ignored.
 func (b BaseMapper[T]) SelectByID(id any, result *T, notObjectID ...bool) error {
 	queryID, err := b.convertID(id, notObjectID...)
 	if err != nil {
@@ -169,7 +170,8 @@ func (b BaseMapper[T]) SelectByID(id any, result *T, notObjectID ...bool) error 
 	return checkSingleResult(coll.FindOne(context.Background(), bson.M{"_id": queryID}), result)
 }
 
-// SelectByIDs 通过多个主键查询数据，默认将字符串 ID 转换为 ObjectID；普通字符串 ID 需要将 notObjectID 设置为 true
+// SelectByIDs decodes matching documents into a nonnil slice pointer; empty IDs return ErrEmptyIDs.
+// Strings become ObjectIDs unless the first notObjectID value is true. Results do not preserve input ID order.
 func (b BaseMapper[T]) SelectByIDs(ids []any, result *[]*T, notObjectID ...bool) (err error) {
 	if len(ids) == 0 {
 		return ErrEmptyIDs
@@ -190,7 +192,8 @@ func (b BaseMapper[T]) SelectByIDs(ids []any, result *[]*T, notObjectID ...bool)
 	return checkMultipleResult(cursor, err, result)
 }
 
-// ExistsByID 判断指定主键的数据是否存在
+// ExistsByID counts matching documents and propagates driver errors.
+// Strings become ObjectIDs unless the first notObjectID value is true.
 func (b BaseMapper[T]) ExistsByID(id any, notObjectID ...bool) (bool, error) {
 	queryID, err := b.convertID(id, notObjectID...)
 	if err != nil {
@@ -207,8 +210,7 @@ func (b BaseMapper[T]) ExistsByID(id any, notObjectID ...bool) (bool, error) {
 	return count > 0, nil
 }
 
-// SelectOneByCond 通过条件查询
-// specifyColumns 需要指定只查询的数据库字段
+// SelectOneByCond decodes one typed-filter match using projection and sorting; Limit is ignored.
 func (b BaseMapper[T]) SelectOneByCond(query CondQuery[T], result *T) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -221,8 +223,7 @@ func (b BaseMapper[T]) SelectOneByCond(query CondQuery[T], result *T) error {
 	return checkSingleResult(coll.FindOne(context.Background(), query.Condition, opt), result)
 }
 
-// SelectOneByBSON 通过 BSON 条件查询一条数据
-// specifyColumns 需要指定只查询的数据库字段
+// SelectOneByBSON decodes one BSON-filter match using projection and sorting; Limit is ignored.
 func (b BaseMapper[T]) SelectOneByBSON(query BSONQuery, result *T) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -235,7 +236,7 @@ func (b BaseMapper[T]) SelectOneByBSON(query BSONQuery, result *T) error {
 	return checkSingleResult(coll.FindOne(context.Background(), query.Condition, opt), result)
 }
 
-// SelectOneWithOptions 使用原生 FindOneOptions 查询一条数据
+// SelectOneWithOptions decodes one match using driver options; absence returns mongo.ErrNoDocuments.
 func (b BaseMapper[T]) SelectOneWithOptions(filter any, result *T, opts ...options.Lister[options.FindOneOptions]) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -244,8 +245,7 @@ func (b BaseMapper[T]) SelectOneWithOptions(filter any, result *T, opts ...optio
 	return checkSingleResult(coll.FindOne(context.Background(), filter, opts...), result)
 }
 
-// SelectByCond 通过条件查询
-// specifyColumns 需要指定只查询的数据库字段
+// SelectByCond decodes typed-filter matches; zero Limit is unlimited and a negative Limit is rejected.
 func (b BaseMapper[T]) SelectByCond(query CondQuery[T], result *[]*T) error {
 	if query.Limit < 0 {
 		return ErrInvalidQueryRange
@@ -267,8 +267,7 @@ func (b BaseMapper[T]) SelectByCond(query CondQuery[T], result *[]*T) error {
 	return checkMultipleResult(cursor, err, result)
 }
 
-// SelectByBSON 通过 BSON 条件查询数据
-// specifyColumns 需要指定只查询的数据库字段
+// SelectByBSON decodes BSON-filter matches; zero Limit is unlimited and a negative Limit is rejected.
 func (b BaseMapper[T]) SelectByBSON(query BSONQuery, result *[]*T) error {
 	if query.Limit < 0 {
 		return ErrInvalidQueryRange
@@ -290,7 +289,7 @@ func (b BaseMapper[T]) SelectByBSON(query BSONQuery, result *[]*T) error {
 	return checkMultipleResult(cursor, err, result)
 }
 
-// SelectWithOptions 使用原生 FindOptions 查询数据
+// SelectWithOptions decodes matching documents into a nonnil slice pointer using driver options.
 func (b BaseMapper[T]) SelectWithOptions(filter any, result *[]*T, opts ...options.Lister[options.FindOptions]) error {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -300,7 +299,7 @@ func (b BaseMapper[T]) SelectWithOptions(filter any, result *[]*T, opts ...optio
 	return checkMultipleResult(cursor, err, result)
 }
 
-// CountByCond 通过实体条件统计数据。
+// CountByCond counts typed-filter matches; projection, sorting, and Limit are ignored.
 func (b BaseMapper[T]) CountByCond(query CondQuery[T]) (int64, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -309,7 +308,7 @@ func (b BaseMapper[T]) CountByCond(query CondQuery[T]) (int64, error) {
 	return coll.CountDocuments(context.Background(), query.Condition)
 }
 
-// CountByBSON 通过 BSON 条件统计数据。
+// CountByBSON counts BSON-filter matches; projection, sorting, and Limit are ignored.
 func (b BaseMapper[T]) CountByBSON(query BSONQuery) (int64, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -318,7 +317,7 @@ func (b BaseMapper[T]) CountByBSON(query BSONQuery) (int64, error) {
 	return coll.CountDocuments(context.Background(), query.Condition)
 }
 
-// CountWithOptions 使用原生 CountOptions 统计数据总数
+// CountWithOptions counts matching documents using driver options, which may restrict the total.
 func (b BaseMapper[T]) CountWithOptions(filter any, opts ...options.Lister[options.CountOptions]) (int64, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -327,7 +326,8 @@ func (b BaseMapper[T]) CountWithOptions(filter any, opts ...options.Lister[optio
 	return coll.CountDocuments(context.Background(), filter, opts...)
 }
 
-// SelectPageByCond 通过实体条件分页查询
+// SelectPageByCond counts then decodes a typed-filter page without a shared snapshot.
+// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
 func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total int64, err error) {
 	if _, err = pageOffset(query.Number, query.Size); err != nil {
 		return 0, err
@@ -357,7 +357,8 @@ func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total
 	return total, checkMultipleResult(cursor, err, result)
 }
 
-// SelectPageByBSON 通过 BSON 条件分页查询
+// SelectPageByBSON counts then decodes a BSON-filter page without a shared snapshot.
+// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
 func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (total int64, err error) {
 	if _, err = pageOffset(query.Number, query.Size); err != nil {
 		return 0, err
@@ -387,7 +388,8 @@ func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (tota
 	return total, checkMultipleResult(cursor, err, result)
 }
 
-// SelectPageWithOptions 使用原生查询选项分页查询
+// SelectPageWithOptions counts then decodes a native-filter page without a shared snapshot.
+// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
 func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T) (total int64, err error) {
 	if _, err = pageOffset(query.Number, query.Size); err != nil {
 		return 0, err
@@ -423,7 +425,7 @@ func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T
 	return total, checkMultipleResult(cursor, err, result)
 }
 
-// Insert 保存数据
+// Insert writes a document and returns its acknowledged ID; ObjectIDs are formatted as hexadecimal strings.
 func (b BaseMapper[T]) Insert(entity *T) (string, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -432,7 +434,7 @@ func (b BaseMapper[T]) Insert(entity *T) (string, error) {
 	return checkSingleInsertResult(coll.InsertOne(context.Background(), entity))
 }
 
-// InsertWithBSON 使用 BSON 文档插入数据
+// InsertWithBSON writes a BSON document and returns its acknowledged ID as a string.
 func (b BaseMapper[T]) InsertWithBSON(entity bson.M) (string, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -441,7 +443,7 @@ func (b BaseMapper[T]) InsertWithBSON(entity bson.M) (string, error) {
 	return checkSingleInsertResult(coll.InsertOne(context.Background(), entity))
 }
 
-// InsertWithOptions 使用原生 InsertOneOptions 插入数据
+// InsertWithOptions writes a native document using driver options and returns its acknowledged ID.
 func (b BaseMapper[T]) InsertWithOptions(document any, opts ...options.Lister[options.InsertOneOptions]) (string, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -450,7 +452,8 @@ func (b BaseMapper[T]) InsertWithOptions(document any, opts ...options.Lister[op
 	return checkSingleInsertResult(coll.InsertOne(context.Background(), document, opts...))
 }
 
-// InsertBatch 批量保存数据
+// InsertBatch writes documents and returns acknowledged IDs as strings.
+// A driver error may follow partial insertion; this helper returns no IDs on error.
 func (b BaseMapper[T]) InsertBatch(entities []*T) ([]string, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -459,7 +462,8 @@ func (b BaseMapper[T]) InsertBatch(entities []*T) ([]string, error) {
 	return checkMultipleInsertResult(coll.InsertMany(context.Background(), entities))
 }
 
-// InsertBatchWithBSON 使用 BSON 文档批量插入数据
+// InsertBatchWithBSON writes BSON documents and returns acknowledged IDs as strings.
+// A driver error may follow partial insertion; this helper returns no IDs on error.
 func (b BaseMapper[T]) InsertBatchWithBSON(entities bson.A) ([]string, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -468,7 +472,8 @@ func (b BaseMapper[T]) InsertBatchWithBSON(entities bson.A) ([]string, error) {
 	return checkMultipleInsertResult(coll.InsertMany(context.Background(), entities))
 }
 
-// InsertBatchWithOptions 使用原生 InsertManyOptions 批量插入数据
+// InsertBatchWithOptions writes native documents using driver options and returns acknowledged IDs.
+// A driver error may follow partial insertion; this helper returns no IDs on error.
 func (b BaseMapper[T]) InsertBatchWithOptions(documents any, opts ...options.Lister[options.InsertManyOptions]) ([]string, error) {
 	coll, err := collection(b.model.CollectionName())
 	if err != nil {
@@ -496,7 +501,8 @@ func (b BaseMapper[T]) convertID(id any, notObjectID ...bool) (any, error) {
 	return queryID, nil
 }
 
-// UpdateByID 根据主键更新数据
+// UpdateByID applies a typed $set update and returns the modified count, not the matched count.
+// Strings become ObjectIDs unless the first notObjectID value is true.
 func (b BaseMapper[T]) UpdateByID(update *T, id any, notObjectID ...bool) (int64, error) {
 	queryID, err := b.convertID(id, notObjectID...)
 	if err != nil {
@@ -509,7 +515,8 @@ func (b BaseMapper[T]) UpdateByID(update *T, id any, notObjectID ...bool) (int64
 	return checkUpdateResult(coll.UpdateByID(context.Background(), queryID, bson.M{"$set": update}))
 }
 
-// UpdateByIDWithBSON 根据主键使用 BSON 文档更新数据
+// UpdateByIDWithBSON applies BSON operators or wraps plain fields in $set; returns the modified count.
+// Strings become ObjectIDs unless the first notObjectID value is true.
 func (b BaseMapper[T]) UpdateByIDWithBSON(update bson.M, id any, notObjectID ...bool) (int64, error) {
 	queryID, err := b.convertID(id, notObjectID...)
 	if err != nil {
@@ -522,7 +529,8 @@ func (b BaseMapper[T]) UpdateByIDWithBSON(update bson.M, id any, notObjectID ...
 	return checkUpdateResult(coll.UpdateByID(context.Background(), queryID, normalizeBSONUpdate(update)))
 }
 
-// UpdateOneByCond 通过条件更新单条数据
+// UpdateOneByCond applies a typed $set update to one match and returns its modified count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) UpdateOneByCond(update *T, condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
@@ -538,7 +546,7 @@ func (b BaseMapper[T]) UpdateOneByCond(update *T, condition T) (int64, error) {
 	return checkUpdateResult(coll.UpdateOne(context.Background(), condition, bson.M{"$set": update}))
 }
 
-// UpdateOneByBSON 通过 BSON 条件更新一条数据
+// UpdateOneByBSON rejects an empty map filter, applies BSON operators/plain fields, and returns the modified count.
 func (b BaseMapper[T]) UpdateOneByBSON(update, condition bson.M) (int64, error) {
 	if len(condition) == 0 {
 		return 0, ErrEmptyCondition
@@ -550,7 +558,8 @@ func (b BaseMapper[T]) UpdateOneByBSON(update, condition bson.M) (int64, error) 
 	return checkUpdateResult(coll.UpdateOne(context.Background(), condition, normalizeBSONUpdate(update)))
 }
 
-// UpdateByCond 通过条件更新多条数据
+// UpdateByCond applies a typed $set update to all matches and returns the modified count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) UpdateByCond(update *T, condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
@@ -566,7 +575,7 @@ func (b BaseMapper[T]) UpdateByCond(update *T, condition T) (int64, error) {
 	return checkUpdateResult(coll.UpdateMany(context.Background(), condition, bson.M{"$set": update}))
 }
 
-// UpdateByBSON 通过 BSON 条件更新多条数据
+// UpdateByBSON rejects an empty map filter, applies BSON operators/plain fields, and returns the modified count.
 func (b BaseMapper[T]) UpdateByBSON(update, condition bson.M) (int64, error) {
 	if len(condition) == 0 {
 		return 0, ErrEmptyCondition
@@ -578,7 +587,8 @@ func (b BaseMapper[T]) UpdateByBSON(update, condition bson.M) (int64, error) {
 	return checkUpdateResult(coll.UpdateMany(context.Background(), condition, normalizeBSONUpdate(update)))
 }
 
-// UpdateOneWithOptions 使用原生 UpdateOneOptions 更新单条数据
+// UpdateOneWithOptions updates one match using native update data/options and returns the modified count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) UpdateOneWithOptions(filter, update any, opts ...options.Lister[options.UpdateOneOptions]) (int64, error) {
 	empty, err := isEmptyCondition(filter)
 	if err != nil {
@@ -594,7 +604,8 @@ func (b BaseMapper[T]) UpdateOneWithOptions(filter, update any, opts ...options.
 	return checkUpdateResult(coll.UpdateOne(context.Background(), filter, update, opts...))
 }
 
-// UpdateWithOptions 使用原生 UpdateManyOptions 更新多条数据
+// UpdateWithOptions updates all matches using native update data/options and returns the modified count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) UpdateWithOptions(filter, update any, opts ...options.Lister[options.UpdateManyOptions]) (int64, error) {
 	empty, err := isEmptyCondition(filter)
 	if err != nil {
@@ -610,7 +621,8 @@ func (b BaseMapper[T]) UpdateWithOptions(filter, update any, opts ...options.Lis
 	return checkUpdateResult(coll.UpdateMany(context.Background(), filter, update, opts...))
 }
 
-// DeleteByID 根据主键删除数据
+// DeleteByID removes one ID match and returns its deleted count.
+// Strings become ObjectIDs unless the first notObjectID value is true.
 func (b BaseMapper[T]) DeleteByID(id any, notObjectID ...bool) (int64, error) {
 	queryID, err := b.convertID(id, notObjectID...)
 	if err != nil {
@@ -623,7 +635,8 @@ func (b BaseMapper[T]) DeleteByID(id any, notObjectID ...bool) (int64, error) {
 	return checkDeleteResult(coll.DeleteOne(context.Background(), bson.M{"_id": queryID}))
 }
 
-// DeleteByIDs 根据多个主键删除数据
+// DeleteByIDs removes ID matches and returns the deleted count; empty IDs return ErrEmptyIDs.
+// Strings become ObjectIDs unless the first notObjectID value is true.
 func (b BaseMapper[T]) DeleteByIDs(ids []any, notObjectID ...bool) (int64, error) {
 	if len(ids) == 0 {
 		return 0, ErrEmptyIDs
@@ -643,7 +656,8 @@ func (b BaseMapper[T]) DeleteByIDs(ids []any, notObjectID ...bool) (int64, error
 	return checkDeleteResult(coll.DeleteMany(context.Background(), bson.M{"_id": bson.M{"$in": queryIDs}}))
 }
 
-// DeleteOneByCond 通过条件删除数据
+// DeleteOneByCond deletes one typed-filter match and returns the deleted count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) DeleteOneByCond(condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
@@ -659,7 +673,7 @@ func (b BaseMapper[T]) DeleteOneByCond(condition T) (int64, error) {
 	return checkDeleteResult(coll.DeleteOne(context.Background(), condition))
 }
 
-// DeleteOneByBSON 通过 BSON 条件删除一条数据
+// DeleteOneByBSON rejects an empty map filter and returns the deleted count for one match.
 func (b BaseMapper[T]) DeleteOneByBSON(condition bson.M) (int64, error) {
 	if len(condition) == 0 {
 		return 0, ErrEmptyCondition
@@ -671,7 +685,8 @@ func (b BaseMapper[T]) DeleteOneByBSON(condition bson.M) (int64, error) {
 	return checkDeleteResult(coll.DeleteOne(context.Background(), condition))
 }
 
-// DeleteByCond 通过条件删除数据
+// DeleteByCond deletes all typed-filter matches and returns the deleted count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) DeleteByCond(condition T) (int64, error) {
 	empty, err := isEmptyCondition(condition)
 	if err != nil {
@@ -687,7 +702,7 @@ func (b BaseMapper[T]) DeleteByCond(condition T) (int64, error) {
 	return checkDeleteResult(coll.DeleteMany(context.Background(), condition))
 }
 
-// DeleteByBSON 通过 BSON 条件删除多条数据
+// DeleteByBSON rejects an empty map filter and returns the deleted count for all matches.
 func (b BaseMapper[T]) DeleteByBSON(condition bson.M) (int64, error) {
 	if len(condition) == 0 {
 		return 0, ErrEmptyCondition
@@ -699,7 +714,8 @@ func (b BaseMapper[T]) DeleteByBSON(condition bson.M) (int64, error) {
 	return checkDeleteResult(coll.DeleteMany(context.Background(), condition))
 }
 
-// DeleteOneWithOptions 使用原生 DeleteOneOptions 删除单条数据
+// DeleteOneWithOptions deletes one native-filter match using driver options and returns the deleted count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) DeleteOneWithOptions(filter any, opts ...options.Lister[options.DeleteOneOptions]) (int64, error) {
 	empty, err := isEmptyCondition(filter)
 	if err != nil {
@@ -715,7 +731,8 @@ func (b BaseMapper[T]) DeleteOneWithOptions(filter any, opts ...options.Lister[o
 	return checkDeleteResult(coll.DeleteOne(context.Background(), filter, opts...))
 }
 
-// DeleteWithOptions 使用原生 DeleteManyOptions 删除多条数据
+// DeleteWithOptions deletes all native-filter matches using driver options and returns the deleted count.
+// The empty-filter check uses default BSON encoding, not configured BSONOptions; verify filter selectivity explicitly.
 func (b BaseMapper[T]) DeleteWithOptions(filter any, opts ...options.Lister[options.DeleteManyOptions]) (int64, error) {
 	empty, err := isEmptyCondition(filter)
 	if err != nil {
