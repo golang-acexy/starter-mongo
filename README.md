@@ -50,12 +50,13 @@ The default database may come from the URI path or `Database`; the explicit fiel
 | --- | --- |
 | `MongoURI` | MongoDB connection URI. |
 | `Database` | Explicit default database. |
+| `Pool` | Per-server connection pool overrides; nil fields preserve URI or driver defaults. |
 | `BSONOptions` | Default BSON encoding and decoding behavior. |
 | `EnableLogger` | Log command and database names at trace level. |
 | `Compressors` | Network compression algorithms. |
 | `InitFunc` | Callback invoked after startup with the initialized client. |
 
-A `nil` `Compressors` value enables the starter defaults: `zstd`, `zlib`, and `snappy`. An empty slice disables compression. This field overrides compression settings in the URI. Configuration is cached once; compressors and BSON options are copied, and later changes to input configuration do not reconfigure the client.
+A `nil` `Compressors` value enables the starter defaults: `zstd`, `zlib`, and `snappy`. An empty slice disables compression. This field overrides compression settings in the URI. Configuration is cached once; compressors, BSON options, and pool pointer values are copied, and later changes to input configuration do not reconfigure the client.
 
 ```go
 starter := &mongostarter.MongoStarter{
@@ -73,23 +74,36 @@ Startup validates the URI and database, connects, and pings the primary server w
 
 ### Connection Pool and Timeouts
 
-Pool sizes and driver timeouts currently have no separate `MongoConfig` fields. Configure them in `MongoURI`:
+Use `Pool` for typed settings, or keep existing pool options in `MongoURI`. Precedence is applied per field: **non-nil Pool field > URI option > driver default**.
 
 ```go
-MongoURI: "mongodb://127.0.0.1:27017/app?maxPoolSize=100&minPoolSize=5&maxConnecting=4&timeoutMS=10000",
+maxPool, minPool, maxConnecting := uint64(50), uint64(5), uint64(2)
+maxIdleTime := 5 * time.Minute
+starter := &mongostarter.MongoStarter{
+    Config: mongostarter.MongoConfig{
+        MongoURI: "mongodb://127.0.0.1:27017/app?timeoutMS=10000",
+        Pool: mongostarter.PoolConfig{
+            MaxPoolSize:     &maxPool,
+            MinPoolSize:     &minPool,
+            MaxConnecting:  &maxConnecting,
+            MaxConnIdleTime: &maxIdleTime,
+        },
+    },
+}
 ```
 
-| URI option | Default and meaning |
-| --- | --- |
-| `maxPoolSize` | 100 connections per server pool; 0 means unlimited |
-| `minPoolSize` | 0; maintains the requested minimum per server pool |
-| `maxConnecting` | 2 simultaneous connection establishments per pool; 0 uses the default |
-| `maxIdleTimeMS` | 0; no idle lifetime limit |
-| `connectTimeoutMS` | 30000; connection establishment timeout, 0 disables it |
-| `serverSelectionTimeoutMS` | 30000; time allowed to select a suitable server |
-| `timeoutMS` | Unset; no default client operation timeout |
+| Pool field | URI option | Driver default | Explicit zero |
+| --- | --- | --- | --- |
+| `MaxPoolSize` | `maxPoolSize` | 100 | Unlimited connections per server pool |
+| `MinPoolSize` | `minPoolSize` | 0 | No maintained minimum |
+| `MaxConnecting` | `maxConnecting` | 2 | Use the driver default of 2 |
+| `MaxConnIdleTime` | `maxIdleTimeMS` | 0 | No idle time limit |
 
-These are driver `v2.9.2` defaults. Pool limits apply per server, not to all client connections combined. A nonzero maximum must be at least the minimum. Setting longer driver timeouts does not extend the starter's five-second startup Ping deadline. `InitFunc` receives an already initialized client and cannot set connection-pool initialization options.
+Nil fields retain the URI setting or driver default. For example, with URI `maxPoolSize=100&minPoolSize=5`, setting only `Pool.MaxPoolSize` to 30 preserves the minimum of 5. Use a pointer to zero to clear a URI minimum or idle limit. The URI must still be valid; an override does not repair URI parsing errors.
+
+A negative idle duration or a minimum exceeding the effective nonzero maximum returns `ErrInvalidPoolConfig` before connecting. This includes the default maximum of 100 when no maximum is specified. Counts use `uint64`. Limits apply per server pool, not to all client connections combined. There is no SQL-style maximum idle connection count or connection total-lifetime field.
+
+Driver timeouts remain URI options: `connectTimeoutMS` defaults to 30000 (zero disables it), `serverSelectionTimeoutMS` defaults to 30000, and `timeoutMS` is unset by default. These are driver `v2.9.2` defaults. Pool settings and longer driver timeouts do not extend the starter's fixed five-second startup Ping deadline. `InitFunc` receives an already initialized client and cannot change pool initialization options; configure `Pool` before startup.
 
 ## Model and Mapper
 
@@ -301,3 +315,13 @@ The tests under `test/` use a real MongoDB deployment and are guarded by the `in
 ```bash
 MONGO_TEST_URI='mongodb://YOUR_USERNAME:YOUR_PASSWORD@127.0.0.1:27017/app' go test -tags=integration ./test
 ```
+
+### Connection Pool Integration Tests
+
+Set `MONGO_TEST_URI` to a reachable single-server MongoDB URI with appropriate authentication and, when needed, `directConnection=true`. Then run:
+
+```bash
+go test -mod=readonly -tags=integration -race -timeout=90s -count=1 -v ./mongostarter -run '^TestPoolIntegration'
+```
+
+These tests require the URI and fail when it is absent. They issue only Ping commands and verify pool capacity waits, minimum size, concurrent connection establishment, idle expiration, explicit zero overrides, and starter startup/shutdown. They do not execute the separate Mapper integration tests or their data cleanup.

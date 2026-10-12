@@ -39,13 +39,15 @@ const (
 	lifecycleStopping
 )
 
-// MongoConfig configures the singleton client; connection pool and driver timeouts are configured through MongoURI.
+// MongoConfig configures the singleton client; explicit Pool fields override MongoURI pool options.
 type MongoConfig struct {
 
 	// Database selects the default database; nonempty values override the URI path.
 	Database string
 	// MongoURI is required and configures driver options, including pool sizes and timeouts.
 	MongoURI string
+	// Pool overrides individual URI pool options; nil fields preserve URI or driver defaults.
+	Pool PoolConfig
 	// BSONOptions configures driver encoding/decoding; empty-filter guards use default encoding instead.
 	BSONOptions *options.BSONOptions
 	// EnableLogger logs command and database names at trace level without command payloads.
@@ -60,12 +62,12 @@ type MongoConfig struct {
 // MongoStarter owns the shared client lifecycle; configure fields before startup and keep them fixed while running.
 type MongoStarter struct {
 	// Config supplies static configuration when LazyConfig is nil.
-	Config     MongoConfig
+	Config MongoConfig
 	// LazyConfig takes precedence and is evaluated once on first resolution during startup or the init hook.
 	LazyConfig func() MongoConfig
 
-	config       *MongoConfig
-	configOnce   sync.Once
+	config     *MongoConfig
+	configOnce sync.Once
 	// MongoSetting overrides the default parent setting, including the InitFunc hook.
 	MongoSetting *parent.Setting
 }
@@ -79,6 +81,7 @@ func (m *MongoStarter) getConfig() *MongoConfig {
 			config = m.Config
 		}
 		config.Compressors = slices.Clone(config.Compressors)
+		config.Pool = clonePoolConfig(config.Pool)
 		if config.BSONOptions != nil {
 			bsonOptions := *config.BSONOptions
 			config.BSONOptions = &bsonOptions
@@ -133,6 +136,9 @@ func (m *MongoStarter) Start() (any, error) {
 	}
 	database := config.Database
 	clientOptions := options.Client().ApplyURI(config.MongoURI)
+	if err := applyPoolConfig(clientOptions, config.Pool); err != nil {
+		return nil, err
+	}
 	if config.EnableLogger {
 		monitor := &event.CommandMonitor{
 			Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
