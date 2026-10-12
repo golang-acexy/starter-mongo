@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-// checkSingleResult 检查单条查询结果
+// checkSingleResult preserves query errors, including mongo.ErrNoDocuments, before decoding.
 func checkSingleResult(singleResult *mongo.SingleResult, result any) error {
 	if singleResult.Err() != nil {
 		return singleResult.Err()
@@ -17,7 +17,7 @@ func checkSingleResult(singleResult *mongo.SingleResult, result any) error {
 	return singleResult.Decode(result)
 }
 
-// checkMultipleResult 检查多条查询结果
+// checkMultipleResult decodes all documents and closes the cursor; partial results can remain after an error.
 func checkMultipleResult(cursor *mongo.Cursor, err error, result any) error {
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func checkMultipleResult(cursor *mongo.Cursor, err error, result any) error {
 	return cursor.All(context.Background(), result)
 }
 
-// checkSingleInsertResult 检查单条插入结果
+// checkSingleInsertResult requires acknowledgment and formats the inserted ID.
 func checkSingleInsertResult(result *mongo.InsertOneResult, err error) (string, error) {
 	if err != nil {
 		return "", err
@@ -41,7 +41,7 @@ func checkSingleInsertResult(result *mongo.InsertOneResult, err error) (string, 
 	return fmt.Sprintf("%v", result.InsertedID), nil
 }
 
-// checkMultipleInsertResult 检查多条插入结果
+// checkMultipleInsertResult requires acknowledgment and returns no IDs when the driver reports an error.
 func checkMultipleInsertResult(result *mongo.InsertManyResult, err error) ([]string, error) {
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func checkMultipleInsertResult(result *mongo.InsertManyResult, err error) ([]str
 	}), nil
 }
 
-// checkUpdateResult 检查更新结果
+// checkUpdateResult requires acknowledgment and returns modified rather than matched count.
 func checkUpdateResult(result *mongo.UpdateResult, err error) (int64, error) {
 	if err != nil {
 		return 0, err
@@ -69,7 +69,7 @@ func checkUpdateResult(result *mongo.UpdateResult, err error) (int64, error) {
 	return result.ModifiedCount, nil
 }
 
-// checkDeleteResult 检查删除结果
+// checkDeleteResult requires acknowledgment and returns deleted count.
 func checkDeleteResult(result *mongo.DeleteResult, err error) (int64, error) {
 	if err != nil {
 		return 0, err

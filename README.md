@@ -9,7 +9,7 @@
 - Typed models, `bson.M`, and native driver filters/options can be used side by side.
 - String IDs support both MongoDB `ObjectID` and ordinary string values.
 - Multi-field sorting, projection, and native find/count options are built into pagination.
-- Empty-condition updates and deletes are rejected before reaching MongoDB.
+- Mutation APIs include empty-filter checks; review the custom BSON encoding limitation below.
 - Write APIs return acknowledged insert IDs or affected document counts.
 - Narrow raw accessors remain available for advanced driver operations.
 
@@ -42,7 +42,7 @@ if err := loader.Start(); err != nil {
 }
 ```
 
-The default database may come from the URI path or `Database`; the explicit field takes precedence. Use `LazyConfig` to resolve configuration immediately before startup. It takes precedence over `Config` when both are present. Stop the client through the parent loader so it participates in the shared shutdown lifecycle.
+The default database may come from the URI path or `Database`; the explicit field takes precedence. Use `LazyConfig` to resolve configuration once at first use during startup or the default initialization hook. It takes precedence over `Config` when both are present. Stop the client through the parent loader so it participates in the shared shutdown lifecycle.
 
 ## Configuration
 
@@ -50,12 +50,13 @@ The default database may come from the URI path or `Database`; the explicit fiel
 | --- | --- |
 | `MongoURI` | MongoDB connection URI. |
 | `Database` | Explicit default database. |
+| `Pool` | Per-server connection pool overrides; nil fields preserve URI or driver defaults. |
 | `BSONOptions` | Default BSON encoding and decoding behavior. |
 | `EnableLogger` | Log command and database names at trace level. |
 | `Compressors` | Network compression algorithms. |
 | `InitFunc` | Callback invoked after startup with the initialized client. |
 
-A `nil` `Compressors` value enables the starter defaults: `zstd`, `zlib`, and `snappy`. An empty slice disables those defaults.
+A `nil` `Compressors` value enables the starter defaults: `zstd`, `zlib`, and `snappy`. An empty slice disables compression. This field overrides compression settings in the URI. Configuration is cached once; compressors, BSON options, and pool pointer values are copied, and later changes to input configuration do not reconfigure the client.
 
 ```go
 starter := &mongostarter.MongoStarter{
@@ -69,7 +70,40 @@ starter := &mongostarter.MongoStarter{
 }
 ```
 
-Startup validates the URI and database, connects, and pings the primary server before publishing the client.
+Startup validates the URI and database, connects, and pings the primary server with a fixed five-second deadline before making the client available. The primary health-check deadline is separate from driver connection and operation timeouts. `InitFunc` runs through the default parent hook after successful startup; replacing `MongoSetting` replaces this hook too.
+
+### Connection Pool and Timeouts
+
+Use `Pool` for typed settings, or keep existing pool options in `MongoURI`. Precedence is applied per field: **non-nil Pool field > URI option > driver default**.
+
+```go
+maxPool, minPool, maxConnecting := uint64(50), uint64(5), uint64(2)
+maxIdleTime := 5 * time.Minute
+starter := &mongostarter.MongoStarter{
+    Config: mongostarter.MongoConfig{
+        MongoURI: "mongodb://127.0.0.1:27017/app?timeoutMS=10000",
+        Pool: mongostarter.PoolConfig{
+            MaxPoolSize:     &maxPool,
+            MinPoolSize:     &minPool,
+            MaxConnecting:  &maxConnecting,
+            MaxConnIdleTime: &maxIdleTime,
+        },
+    },
+}
+```
+
+| Pool field | URI option | Driver default | Explicit zero |
+| --- | --- | --- | --- |
+| `MaxPoolSize` | `maxPoolSize` | 100 | Unlimited connections per server pool |
+| `MinPoolSize` | `minPoolSize` | 0 | No maintained minimum |
+| `MaxConnecting` | `maxConnecting` | 2 | Use the driver default of 2 |
+| `MaxConnIdleTime` | `maxIdleTimeMS` | 0 | No idle time limit |
+
+Nil fields retain the URI setting or driver default. For example, with URI `maxPoolSize=100&minPoolSize=5`, setting only `Pool.MaxPoolSize` to 30 preserves the minimum of 5. Use a pointer to zero to clear a URI minimum or idle limit. The URI must still be valid; an override does not repair URI parsing errors.
+
+A negative idle duration or a minimum exceeding the effective nonzero maximum returns `ErrInvalidPoolConfig` before connecting. This includes the default maximum of 100 when no maximum is specified. Counts use `uint64`. Limits apply per server pool, not to all client connections combined. There is no SQL-style maximum idle connection count or connection total-lifetime field.
+
+Driver timeouts remain URI options: `connectTimeoutMS` defaults to 30000 (zero disables it), `serverSelectionTimeoutMS` defaults to 30000, and `timeoutMS` is unset by default. These are driver `v2.9.2` defaults. Pool settings and longer driver timeouts do not extend the starter's fixed five-second startup Ping deadline. `InitFunc` receives an already initialized client and cannot change pool initialization options; configure `Pool` before startup.
 
 ## Model and Mapper
 
@@ -132,9 +166,9 @@ err = mapper.SelectWithOptions(
 )
 ```
 
-Use `SelectOne...` for one document and `Count...` for counts. Typed conditions use value semantics: `T` is the condition, `*T` is a single-result destination, and `*[]*T` is a list destination.
+Use `SelectOne...` for one document and `Count...` for counts. A missing single result returns `mongo.ErrNoDocuments`; list operations decode into the supplied destination. Keep destination pointers nonnil and avoid sharing mutable result buffers between concurrent operations. Typed conditions use value semantics: `T` is the condition, `*T` is a single-result destination, and `*[]*T` is a list destination.
 
-Count operations use the same condition query structures as document queries:
+Count operations use the same condition query structures as document queries but ignore their projection, sorting, and list limit:
 
 ```go
 total, err := mapper.CountByBSON(
@@ -204,7 +238,7 @@ deleted, err = mapper.DeleteByCond(User{Status: "disabled"})
 deleted, err = mapper.DeleteByID("507f1f77bcf86cd799439011")
 ```
 
-Delete APIs return MongoDB's deleted document count. Condition-based updates and deletes reject empty conditions with `ErrEmptyCondition`.
+Delete APIs return MongoDB's deleted document count. Condition-based updates and deletes reject filters considered empty by their guard with `ErrEmptyCondition`. Typed and native filter guards currently use default BSON encoding rather than configured `BSONOptions`. Options such as `OmitEmpty` or `UseJSONStructTags` can therefore change the actual filter after it passes the check. Do not rely on the guard alone: verify that the encoded filter is selective, or use an explicitly constructed BSON filter.
 
 ## Pagination
 
@@ -224,7 +258,7 @@ var users []*User
 total, err := mapper.SelectPageByBSON(query, &users)
 ```
 
-Pagination variants include `SelectPageByCond`, `SelectPageByBSON`, and `SelectPageWithOptions`.
+Pagination variants include `SelectPageByCond`, `SelectPageByBSON`, and `SelectPageWithOptions`. Count and find run separately and can observe different data. Explicit page settings override native skip/limit options. Do not concurrently reuse pagination queries sharing `FindOptions` storage; option builders and BSON maps must also remain stable while used.
 
 ## Raw Driver Access
 
@@ -237,15 +271,15 @@ otherDatabase := mongostarter.RawDatabase("analytics")
 collection := mongostarter.RawCollection("users")
 ```
 
-Raw accessors return `nil` before startup. `mapper.Collection()` follows the same behavior and resolves the collection name from the model.
+Raw accessors return `nil` before startup and after shutdown withdraws the client. Callers must not disconnect the shared client. `RawDatabase()` selects the default database; `RawDatabase("")` passes an empty database name rather than selecting the default. Only the first optional database argument is used. `mapper.Collection()` follows the same behavior and resolves the collection name from the model.
 
 ## Timestamp
 
-`mongostarter.Timestamp` stores BSON dates and serializes JSON as Unix timestamps. A zero timestamp is stored as BSON `null` and decoded as Go's zero `time.Time`.
+`mongostarter.Timestamp` stores BSON dates at millisecond precision and serializes JSON as Unix timestamps using the toolkit global seconds/milliseconds setting. Zero time is stored as BSON `null` and JSON numeric zero; BSON or JSON null resets the value to Go's zero `time.Time`. JSON numeric zero instead decodes to the Unix epoch.
 
 ## Safety and Errors
 
-- Empty update or delete conditions return `ErrEmptyCondition`.
+- Filters considered empty by the mutation guard return `ErrEmptyCondition`; custom BSON encoding can bypass this protection as described above.
 - Empty ID batches return `ErrEmptyIDs`.
 - Invalid pagination returns `ErrInvalidPage`.
 - Empty or nil sorting rules return `ErrInvalidOrderBy`.
@@ -261,6 +295,12 @@ Exported package errors support `errors.Is`.
 - The package owns one process-wide client and one default database.
 - Multiple active `MongoStarter` instances are not supported.
 - Configuration is resolved once and retained for the starter lifecycle.
+- Mapper operations use background contexts. URI `timeoutMS` can bound driver operations, but request cancellation and transaction sessions are not inherited; use raw collections when those contexts are required.
+- Query builders copy sorting, projection, and option slices where documented; filter maps and option implementations remain borrowed. Keep mutable inputs stable during use.
+- Batch insertion can partially succeed before a driver error; helpers return no IDs on error and do not roll back inserted documents.
+- Shutdown withdraws the client before disconnecting. A timeout returns `gracefully=false`, `stopped=true`, and `ErrMongoStopTimeout`; retained native handles do not bypass shutdown.
+- Command logging records command and database names without full payloads.
+- A successfully stopped MongoDB starter is not restartable through the parent lifecycle.
 
 ## Testing
 
@@ -275,6 +315,13 @@ The tests under `test/` use a real MongoDB deployment and are guarded by the `in
 ```bash
 MONGO_TEST_URI='mongodb://YOUR_USERNAME:YOUR_PASSWORD@127.0.0.1:27017/app' go test -tags=integration ./test
 ```
-- Shutdown disconnects the client and clears package-owned runtime state.
-- Command logging records command and database names without full payloads.
-- A successfully stopped MongoDB starter is not restartable through the parent lifecycle.
+
+### Connection Pool Integration Tests
+
+Set `MONGO_TEST_URI` to a reachable single-server MongoDB URI with appropriate authentication and, when needed, `directConnection=true`. Then run:
+
+```bash
+go test -mod=readonly -tags=integration -race -timeout=90s -count=1 -v ./mongostarter -run '^TestPoolIntegration'
+```
+
+These tests require the URI and fail when it is absent. They issue only Ping commands and verify pool capacity waits, minimum size, concurrent connection establishment, idle expiration, explicit zero overrides, and starter startup/shutdown. They do not execute the separate Mapper integration tests or their data cleanup.
