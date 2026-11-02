@@ -35,28 +35,28 @@ type OrderBy struct {
 // QueryOptions configures projection, ordered sorting, and list-only limits; keep inputs stable during use.
 type QueryOptions struct {
 	// OrderBy lists sort rules in precedence order; nil entries and blank columns are rejected.
-	OrderBy       []*OrderBy
+	OrderBy []*OrderBy
 	// SelectColumns specifies inclusion fields; _id is excluded unless explicitly selected.
 	SelectColumns []string
 	// Limit applies only to list reads: zero is unlimited, negative values are rejected.
-	Limit         int
+	Limit int
 }
 
 // PageOptions contains all pagination inputs. Native count and find options are applied separately.
-// Page methods append to FindOptions and may reuse its backing storage; concurrent reuse is unsupported.
+// Page methods preserve option slice storage; filters and option implementations must remain immutable during concurrent use.
 type PageOptions struct {
 	// Number is the one-based page number; nonpositive values are rejected.
-	Number        int
+	Number int
 	// Size is the positive page limit; no application-wide maximum is enforced.
-	Size          int
+	Size int
 	// OrderBy lists sort rules in precedence order; nil entries and blank columns are rejected.
-	OrderBy       []*OrderBy
+	OrderBy []*OrderBy
 	// SelectColumns specifies inclusion fields; _id is excluded unless explicitly selected.
 	SelectColumns []string
 	// FindOptions supplies native find options; explicit page settings take precedence.
-	FindOptions   []options.Lister[options.FindOptions]
+	FindOptions []options.Lister[options.FindOptions]
 	// CountOptions supplies native count options, which can affect totals independently of the page.
-	CountOptions  []options.Lister[options.CountOptions]
+	CountOptions []options.Lister[options.CountOptions]
 }
 
 // PageQuery combines a typed filter with pagination; model BSON tags determine filter fields.
@@ -209,15 +209,15 @@ type QueryMapper[T Model] interface {
 	CountWithOptions(filter any, opts ...options.Lister[options.CountOptions]) (int64, error)
 
 	// SelectPageByCond counts then decodes a typed-filter page without a shared snapshot.
-	// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
+	// Positive Number/Size are required; page options override native pagination. Option slices are not modified; keep filters and option implementations immutable during concurrent use.
 	SelectPageByCond(query PageQuery[T], result *[]*T) (total int64, err error)
 
 	// SelectPageByBSON counts then decodes a BSON-filter page without a shared snapshot.
-	// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
+	// Positive Number/Size are required; page options override native pagination. Option slices are not modified; keep filters and option implementations immutable during concurrent use.
 	SelectPageByBSON(query BSONPageQuery, result *[]*T) (total int64, err error)
 
 	// SelectPageWithOptions counts then decodes a native-filter page without a shared snapshot.
-	// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
+	// Positive Number/Size are required; page options override native pagination. Option slices are not modified; keep filters and option implementations immutable during concurrent use.
 	SelectPageWithOptions(query FilterPageQuery, result *[]*T) (total int64, err error)
 }
 

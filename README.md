@@ -56,14 +56,14 @@ The default database may come from the URI path or `Database`; the explicit fiel
 | `Compressors` | Network compression algorithms. |
 | `InitFunc` | Callback invoked after startup with the initialized client. |
 
-A `nil` `Compressors` value enables the starter defaults: `zstd`, `zlib`, and `snappy`. An empty slice disables compression. This field overrides compression settings in the URI. Configuration is cached once; compressors, BSON options, and pool pointer values are copied, and later changes to input configuration do not reconfigure the client.
+A `nil` `Compressors` value enables the starter default: `snappy`. An empty slice disables compression. Set `[]string{"zstd"}` explicitly when its compression ratio is worth the additional encoder memory. This field overrides compression settings in the URI. Configuration is cached once; compressors, BSON options, and pool pointer values are copied, and later changes to input configuration do not reconfigure the client.
 
 ```go
 starter := &mongostarter.MongoStarter{
 	Config: mongostarter.MongoConfig{
 		MongoURI:    "mongodb://127.0.0.1:27017",
 		Database:    "app",
-		Compressors: []string{"zstd"},
+		Compressors: []string{"snappy"},
 		BSONOptions: &options.BSONOptions{ObjectIDAsHexString: true},
 		EnableLogger: true,
 	},
@@ -258,7 +258,7 @@ var users []*User
 total, err := mapper.SelectPageByBSON(query, &users)
 ```
 
-Pagination variants include `SelectPageByCond`, `SelectPageByBSON`, and `SelectPageWithOptions`. Count and find run separately and can observe different data. Explicit page settings override native skip/limit options. Do not concurrently reuse pagination queries sharing `FindOptions` storage; option builders and BSON maps must also remain stable while used.
+Pagination variants include `SelectPageByCond`, `SelectPageByBSON`, and `SelectPageWithOptions`. Count and find run separately and can observe different data. Explicit page settings override native skip/limit options. Pagination preserves the caller's `FindOptions` slice storage. Concurrent reuse requires stable filters and concurrency-safe option implementations; never mutate option builders or BSON maps while queries use them.
 
 ## Raw Driver Access
 
