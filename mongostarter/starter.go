@@ -52,7 +52,7 @@ type MongoConfig struct {
 	BSONOptions *options.BSONOptions
 	// EnableLogger logs command and database names at trace level without command payloads.
 	EnableLogger bool
-	// Compressors overrides URI compression; nil selects zstd/zlib/snappy and an empty slice disables compression.
+	// Compressors overrides URI compression; nil selects snappy and an empty slice disables compression.
 	Compressors []string
 
 	// InitFunc is invoked by the default parent hook after startup; it cannot change connection initialization options.
@@ -150,7 +150,7 @@ func (m *MongoStarter) Start() (any, error) {
 	if config.Compressors != nil {
 		clientOptions.SetCompressors(config.Compressors)
 	} else {
-		clientOptions.SetCompressors([]string{"zstd", "zlib", "snappy"})
+		clientOptions.SetCompressors([]string{"snappy"})
 	}
 	if config.BSONOptions != nil {
 		clientOptions.SetBSONOptions(config.BSONOptions)

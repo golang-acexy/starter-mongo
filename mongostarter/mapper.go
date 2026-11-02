@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/acexy/golang-toolkit/util/coll"
@@ -327,7 +328,7 @@ func (b BaseMapper[T]) CountWithOptions(filter any, opts ...options.Lister[optio
 }
 
 // SelectPageByCond counts then decodes a typed-filter page without a shared snapshot.
-// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
+// Positive Number/Size are required; page options override native pagination. Option slices are not modified; keep filters and option implementations immutable during concurrent use.
 func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total int64, err error) {
 	if _, err = pageOffset(query.Number, query.Size); err != nil {
 		return 0, err
@@ -352,13 +353,13 @@ func (b BaseMapper[T]) SelectPageByCond(query PageQuery[T], result *[]*T) (total
 	if err != nil {
 		return 0, err
 	}
-	query.FindOptions = append(query.FindOptions, opt)
+	query.FindOptions = append(slices.Clip(query.FindOptions), opt)
 	cursor, err := coll.Find(context.Background(), query.Condition, query.FindOptions...)
 	return total, checkMultipleResult(cursor, err, result)
 }
 
 // SelectPageByBSON counts then decodes a BSON-filter page without a shared snapshot.
-// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
+// Positive Number/Size are required; page options override native pagination. Option slices are not modified; keep filters and option implementations immutable during concurrent use.
 func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (total int64, err error) {
 	if _, err = pageOffset(query.Number, query.Size); err != nil {
 		return 0, err
@@ -383,13 +384,13 @@ func (b BaseMapper[T]) SelectPageByBSON(query BSONPageQuery, result *[]*T) (tota
 	if err != nil {
 		return 0, err
 	}
-	query.FindOptions = append(query.FindOptions, opt)
+	query.FindOptions = append(slices.Clip(query.FindOptions), opt)
 	cursor, err := coll.Find(context.Background(), query.Condition, query.FindOptions...)
 	return total, checkMultipleResult(cursor, err, result)
 }
 
 // SelectPageWithOptions counts then decodes a native-filter page without a shared snapshot.
-// Positive Number/Size are required; page options override native pagination. Do not share FindOptions backing storage concurrently.
+// Positive Number/Size are required; page options override native pagination. Option slices are not modified; keep filters and option implementations immutable during concurrent use.
 func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T) (total int64, err error) {
 	if _, err = pageOffset(query.Number, query.Size); err != nil {
 		return 0, err
@@ -402,6 +403,8 @@ func (b BaseMapper[T]) SelectPageWithOptions(query FilterPageQuery, result *[]*T
 		return 0, err
 	}
 
+	// Force appended options into private storage without copying the option implementations.
+	query.FindOptions = slices.Clip(query.FindOptions)
 	if len(query.SelectColumns) > 0 {
 		query.FindOptions = append(query.FindOptions, specifyColumnsOpt(query.SelectColumns...))
 	}
